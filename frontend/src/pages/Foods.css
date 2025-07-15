@@ -1,0 +1,219 @@
+.foods-page {
+  padding: 32px;
+  background: #f9f9f9;
+  min-height: 100vh;
+}
+
+.page-header {
+  margin-bottom: 24px;
+}
+
+.page-title {
+  font-size: 2rem;
+  margin-bottom: 4px;
+}
+
+.page-subtitle {
+  color: #666;
+  margin-bottom: 16px;
+}
+
+.foods-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.foods-controls input[type="text"] {
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  min-width: 200px;
+}
+
+.foods-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.foods-tabs button {
+  background: #eee;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px 4px 0 0;
+  cursor: pointer;
+  font-weight: 500;
+  color: #444;
+  transition: background 0.2s;
+}
+
+.foods-tabs button.active {
+  background: #fff;
+  border-bottom: 2px solid #007bff;
+  color: #007bff;
+}
+
+.foods-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.foods-actions button {
+  background: #007bff;
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.foods-actions button:hover {
+  background: #0056b3;
+}
+
+.foods-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  margin-bottom: 24px;
+}
+
+.foods-table th, .foods-table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid #eee;
+  text-align: left;
+}
+
+.foods-table th {
+  background: #f5f5f5;
+  font-weight: 600;
+}
+
+.foods-table tr:last-child td {
+  border-bottom: none;
+}
+
+.foods-table button {
+  background: #eee;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 4px;
+  margin-right: 4px;
+  cursor: pointer;
+  font-size: 0.95em;
+  transition: background 0.2s;
+}
+
+.foods-table button:hover {
+  background: #007bff;
+  color: #fff;
+}
+
+.error {
+  color: #c00;
+  margin: 12px 0;
+}
+
+/* Modal styles */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.2);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal {
+  background: #fff;
+  border-radius: 8px;
+  padding: 32px 24px;
+  min-width: 320px;
+  max-width: 95vw;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+  position: relative;
+}
+
+.modal.large {
+  min-width: 600px;
+  max-width: 900px;
+}
+
+.modal h2 {
+  margin-top: 0;
+  margin-bottom: 18px;
+}
+
+.modal form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modal input, .modal select {
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.add-ingredient {
+  margin-top: 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.add-ingredient select, .add-ingredient input {
+  min-width: 120px;
+}
+
+.add-ingredient button {
+  background: #28a745;
+  color: #fff;
+  border: none;
+  padding: 6px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.add-ingredient button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.add-ingredient button:hover:not(:disabled) {
+  background: #218838;
+}
+
+@media (max-width: 700px) {
+  .modal.large {
+    min-width: 95vw;
+    padding: 16px 4px;
+  }
+  .foods-table th, .foods-table td {
+    padding: 8px 4px;
+    font-size: 0.95em;
+  }
+  .foods-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+} 

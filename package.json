@@ -1,0 +1,37 @@
+{
+  "name": "tracer-web",
+  "version": "1.0.0",
+  "description": "Tracer - Modern Web-based Food Traceability System",
+  "main": "index.js",
+  "scripts": {
+    "start": "./start.sh",
+    "install-all": "cd backend && npm install && cd ../frontend && npm install",
+    "backend": "cd backend && npm start",
+    "frontend": "cd frontend && npm start",
+    "build": "cd frontend && npm run build",
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "haccp",
+    "traceability",
+    "food-safety",
+    "react",
+    "nodejs",
+    "express",
+    "sqlite"
+  ],
+  "author": "HACCP Trace Team",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^6.2.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mads-madsen/tracer.git"
+  },
+  "engines": {
+    "node": ">=14.0.0",
+    "npm": ">=6.0.0"
+  }
+} 

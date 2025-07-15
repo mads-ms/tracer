@@ -1,0 +1,108 @@
+.company-page {
+  padding: 32px;
+  background: #f9f9f9;
+  min-height: 100vh;
+}
+
+.page-header {
+  margin-bottom: 24px;
+}
+
+.page-title {
+  font-size: 2rem;
+  margin-bottom: 4px;
+}
+
+.page-subtitle {
+  color: #666;
+  margin-bottom: 16px;
+}
+
+.company-card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  padding: 32px 24px;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.company-card h3 {
+  margin-top: 0;
+  margin-bottom: 18px;
+}
+
+.company-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-row label {
+  font-weight: 500;
+  color: #444;
+}
+
+.company-form input {
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 1em;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.form-actions button {
+  background: #007bff;
+  color: #fff;
+  border: none;
+  padding: 8px 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.form-actions button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.form-actions button:hover:not(:disabled) {
+  background: #0056b3;
+}
+
+.form-error {
+  color: #c00;
+  background: #ffeaea;
+  border: 1px solid #fbb;
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+}
+
+.form-success {
+  color: #218838;
+  background: #e6f9ed;
+  border: 1px solid #b2e2c7;
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+}
+
+@media (max-width: 600px) {
+  .company-card {
+    padding: 16px 4px;
+    max-width: 98vw;
+  }
+} 
