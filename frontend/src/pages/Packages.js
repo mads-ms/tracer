@@ -43,6 +43,7 @@ import {
   Refresh as RefreshIcon,
   Inventory as InventoryIcon
 } from '@mui/icons-material';
+import { API_ENDPOINTS, buildApiUrl } from '../config/api';
 
 const Packages = () => {
   const [packages, setPackages] = useState([]);
@@ -78,7 +79,7 @@ const Packages = () => {
   const fetchPackages = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3001/api/packages');
+      const response = await fetch(API_ENDPOINTS.PACKAGES);
       if (!response.ok) throw new Error('Failed to fetch packages');
       const data = await response.json();
       setPackages(data);
@@ -91,7 +92,7 @@ const Packages = () => {
 
   const fetchGtinCodes = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/barcodes');
+      const response = await fetch(API_ENDPOINTS.BARCODES);
       if (!response.ok) throw new Error('Failed to fetch GTIN codes');
       const data = await response.json();
       setGtinCodes(data);
@@ -102,7 +103,7 @@ const Packages = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/packages/stats/summary');
+      const response = await fetch(buildApiUrl('packages/stats/summary'));
       if (!response.ok) throw new Error('Failed to fetch stats');
       const data = await response.json();
       setStats(data);
@@ -113,7 +114,7 @@ const Packages = () => {
 
   const fetchPackageFoods = async (packageId) => {
     try {
-      const response = await fetch(`http://localhost:3001/api/packages/${packageId}/foods`);
+      const response = await fetch(buildApiUrl(`packages/${packageId}/foods`));
       if (!response.ok) throw new Error('Failed to fetch package foods');
       const data = await response.json();
       setRawFoods(data.rawFoods || []);
@@ -126,8 +127,8 @@ const Packages = () => {
   const fetchAllFoods = async () => {
     try {
       const [rawResponse, processedResponse] = await Promise.all([
-        fetch('http://localhost:3001/api/foods/raw'),
-        fetch('http://localhost:3001/api/foods/processed')
+        fetch(buildApiUrl('foods/raw')),
+        fetch(buildApiUrl('foods/processed'))
       ]);
       
       if (rawResponse.ok) {
@@ -148,8 +149,8 @@ const Packages = () => {
     e.preventDefault();
     try {
       const url = editingPackage 
-        ? `http://localhost:3001/api/packages/${editingPackage.id}`
-        : 'http://localhost:3001/api/packages';
+        ? `${API_ENDPOINTS.PACKAGES}/${editingPackage.id}`
+        : API_ENDPOINTS.PACKAGES;
       
       const method = editingPackage ? 'PUT' : 'POST';
       
@@ -178,7 +179,7 @@ const Packages = () => {
     if (!window.confirm('Are you sure you want to delete this package?')) return;
     
     try {
-      const response = await fetch(`http://localhost:3001/api/packages/${id}`, {
+      const response = await fetch(`${API_ENDPOINTS.PACKAGES}/${id}`, {
         method: 'DELETE'
       });
 

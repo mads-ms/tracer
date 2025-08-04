@@ -8,12 +8,18 @@
     "dev": "nodemon server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["haccp", "traceability", "food", "safety"],
+  "keywords": [
+    "haccp",
+    "traceability",
+    "food",
+    "safety"
+  ],
   "author": "HACCP Trace Team",
   "license": "MIT",
   "dependencies": {
     "express": "^4.17.1",
     "sqlite3": "^5.0.2",
+    "pg": "^8.11.0",
     "cors": "^2.8.5",
     "body-parser": "^1.19.0",
     "bcryptjs": "^2.4.3",
@@ -29,4 +35,4 @@
   "devDependencies": {
     "nodemon": "^2.0.12"
   }
-} 
+}

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import './Company.css';
+import { API_ENDPOINTS } from '../config/api';
 
-const API_BASE = '/api/company';
+const API_BASE = API_ENDPOINTS.COMPANY;
 
 const Company = () => {
   const [company, setCompany] = useState({

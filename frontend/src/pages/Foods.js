@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import './Dashboard.css';
 import './Foods.css';
+import { API_ENDPOINTS } from '../config/api';
 
-const API_BASE = '/api/foods';
+const API_BASE = API_ENDPOINTS.FOODS;
 
 const Foods = () => {
   // State
@@ -118,7 +119,7 @@ const Foods = () => {
     setRecipeLoading(false);
     // Fetch all lotsIn for ingredient selection
     try {
-      const lotsRes = await fetch('/api/lots-in/');
+      const lotsRes = await fetch(API_ENDPOINTS.LOTS_IN);
       setLotsIn(await lotsRes.json());
     } catch {}
   };

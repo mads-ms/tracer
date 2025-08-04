@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FaPlus, FaEdit, FaTrash, FaSearch, FaTimes } from 'react-icons/fa';
 import axios from 'axios';
+import { API_ENDPOINTS, buildApiUrl } from '../config/api';
 import { toast } from 'react-toastify';
 import './Customers.css';
 
@@ -29,7 +30,7 @@ const Customers = () => {
   const fetchCustomers = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/customers');
+      const response = await axios.get(API_ENDPOINTS.CUSTOMERS);
       setCustomers(response.data);
     } catch (error) {
       console.error('Error fetching customers:', error);
@@ -43,10 +44,10 @@ const Customers = () => {
     e.preventDefault();
     try {
       if (editingCustomer) {
-        await axios.put(`/api/customers/${editingCustomer.id}`, formData);
+        await axios.put(`${API_ENDPOINTS.CUSTOMERS}/${editingCustomer.id}`, formData);
         toast.success('Customer updated successfully');
       } else {
-        await axios.post('/api/customers', formData);
+        await axios.post(API_ENDPOINTS.CUSTOMERS, formData);
         toast.success('Customer created successfully');
       }
       setShowForm(false);
@@ -75,7 +76,7 @@ const Customers = () => {
   const handleDelete = async (customer) => {
     if (window.confirm(`Are you sure you want to delete customer "${customer.name}"?`)) {
       try {
-        await axios.delete(`/api/customers/${customer.id}`);
+        await axios.delete(`${API_ENDPOINTS.CUSTOMERS}/${customer.id}`);
         toast.success('Customer deleted successfully');
         fetchCustomers();
       } catch (error) {
@@ -89,7 +90,7 @@ const Customers = () => {
     setSelectedCustomer(customer);
     setDetailsLoading(true);
     try {
-      const response = await axios.get(`/api/traceability/customer/${customer.id}`);
+      const response = await axios.get(buildApiUrl(`traceability/customer/${customer.id}`));
       setCustomerDetails(response.data);
     } catch (error) {
       toast.error('Failed to load customer details');

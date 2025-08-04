@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: haccp-trace-frontend
+    env: static
+    plan: free
+    buildCommand: |
+      npm install
+      npm run build
+    staticPublishPath: ./build
+    envVars:
+      - key: REACT_APP_API_URL
+        fromService:
+          name: haccp-trace-backend
+          type: web
+          property: host
+      - key: REACT_APP_ENVIRONMENT
+        value: production
+    autoDeploy: true
+    branch: main
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /static/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /index.html
+        name: Cache-Control
+        value: no-cache, no-store, must-revalidate 

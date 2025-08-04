@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FaPlus, FaEdit, FaTrash, FaSearch } from 'react-icons/fa';
 import axios from 'axios';
+import { API_ENDPOINTS, buildApiUrl } from '../config/api';
 import { toast } from 'react-toastify';
 import './LotsIn.css';
 
@@ -32,7 +33,7 @@ const LotsIn = () => {
   const fetchLots = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/lots-in');
+      const response = await axios.get(API_ENDPOINTS.LOTS_IN);
       setLots(response.data);
     } catch (error) {
       console.error('Error fetching lots:', error);
@@ -44,7 +45,7 @@ const LotsIn = () => {
 
   const fetchSuppliers = async () => {
     try {
-      const response = await axios.get('/api/suppliers');
+      const response = await axios.get(API_ENDPOINTS.SUPPLIERS);
       setSuppliers(response.data);
     } catch (error) {
       toast.error('Failed to load suppliers');
@@ -53,7 +54,7 @@ const LotsIn = () => {
 
   const fetchFoods = async () => {
     try {
-      const response = await axios.get('/api/foods/raw');
+      const response = await axios.get(buildApiUrl('foods/raw'));
       setFoods(response.data);
     } catch (error) {
       toast.error('Failed to load food items');
@@ -64,10 +65,10 @@ const LotsIn = () => {
     e.preventDefault();
     try {
       if (editingLot) {
-        await axios.put(`/api/lots-in/${editingLot.id}`, formData);
+        await axios.put(`${API_ENDPOINTS.LOTS_IN}/${editingLot.id}`, formData);
         toast.success('Incoming lot updated successfully');
       } else {
-        await axios.post('/api/lots-in', formData);
+        await axios.post(API_ENDPOINTS.LOTS_IN, formData);
         toast.success('Incoming lot created successfully');
       }
       setShowForm(false);
@@ -97,7 +98,7 @@ const LotsIn = () => {
   const handleDelete = async (lot) => {
     if (window.confirm(`Are you sure you want to delete lot "${lot.lot_number}"?`)) {
       try {
-        await axios.delete(`/api/lots-in/${lot.id}`);
+        await axios.delete(`${API_ENDPOINTS.LOTS_IN}/${lot.id}`);
         toast.success('Incoming lot deleted successfully');
         fetchLots();
       } catch (error) {

@@ -37,6 +37,7 @@ import {
   Refresh as RefreshIcon,
   Receipt as ReceiptIcon
 } from '@mui/icons-material';
+import { API_ENDPOINTS, buildApiUrl } from '../config/api';
 
 const Sales = () => {
   const [sales, setSales] = useState([]);
@@ -74,7 +75,7 @@ const Sales = () => {
   const fetchSales = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3001/api/sales');
+      const response = await fetch(API_ENDPOINTS.SALES);
       if (!response.ok) throw new Error('Failed to fetch sales');
       const data = await response.json();
       setSales(data);
@@ -87,7 +88,7 @@ const Sales = () => {
 
   const fetchCustomers = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/customers');
+      const response = await fetch(API_ENDPOINTS.CUSTOMERS);
       if (!response.ok) throw new Error('Failed to fetch customers');
       const data = await response.json();
       setCustomers(data);
@@ -98,7 +99,7 @@ const Sales = () => {
 
   const fetchOutgoingLots = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/lots-out');
+      const response = await fetch(API_ENDPOINTS.LOTS_OUT);
       if (!response.ok) throw new Error('Failed to fetch outgoing lots');
       const data = await response.json();
       setOutgoingLots(data);
@@ -109,7 +110,7 @@ const Sales = () => {
 
   const fetchIncomingLots = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/lots-in');
+      const response = await fetch(API_ENDPOINTS.LOTS_IN);
       if (!response.ok) throw new Error('Failed to fetch incoming lots');
       const data = await response.json();
       setIncomingLots(data);
@@ -120,7 +121,7 @@ const Sales = () => {
 
   const fetchPackages = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/packages');
+      const response = await fetch(API_ENDPOINTS.PACKAGES);
       if (!response.ok) throw new Error('Failed to fetch packages');
       const data = await response.json();
       setPackages(data);
@@ -131,7 +132,7 @@ const Sales = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/sales/stats/summary');
+      const response = await fetch(buildApiUrl('sales/stats/summary'));
       if (!response.ok) throw new Error('Failed to fetch stats');
       const data = await response.json();
       setStats(data);
@@ -142,7 +143,7 @@ const Sales = () => {
 
   const getNextInvoiceNumber = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/sales/next-invoice-number');
+      const response = await fetch(buildApiUrl('sales/next-invoice-number'));
       if (!response.ok) throw new Error('Failed to get next invoice number');
       const data = await response.json();
       setFormData(prev => ({ ...prev, invoice_number: data.nextInvoiceNumber }));
@@ -155,8 +156,8 @@ const Sales = () => {
     e.preventDefault();
     try {
       const url = editingSale 
-        ? `http://localhost:3001/api/sales/${editingSale.id}`
-        : 'http://localhost:3001/api/sales';
+        ? `${API_ENDPOINTS.SALES}/${editingSale.id}`
+        : API_ENDPOINTS.SALES;
       
       const method = editingSale ? 'PUT' : 'POST';
       
@@ -185,7 +186,7 @@ const Sales = () => {
     if (!window.confirm('Are you sure you want to delete this sale?')) return;
     
     try {
-      const response = await fetch(`http://localhost:3001/api/sales/${id}`, {
+      const response = await fetch(`${API_ENDPOINTS.SALES}/${id}`, {
         method: 'DELETE'
       });
 

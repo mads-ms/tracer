@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FaTruck, FaUsers, FaBoxes, FaClipboardCheck, FaUtensils, FaShoppingCart } from 'react-icons/fa';
 import axios from 'axios';
 import './Dashboard.css';
+import { API_ENDPOINTS, buildApiUrl } from '../config/api';
 
 const Dashboard = () => {
   const [stats, setStats] = useState({
@@ -31,11 +32,11 @@ const Dashboard = () => {
         checksRes,
         foodsRes
       ] = await Promise.all([
-        axios.get('/api/suppliers/stats/summary'),
-        axios.get('/api/customers/stats/summary'),
-        axios.get('/api/lots-in/stats/summary'),
-        axios.get('/api/checks/stats/summary'),
-        axios.get('/api/foods/stats/summary')
+        axios.get(buildApiUrl('suppliers/stats/summary')),
+        axios.get(buildApiUrl('customers/stats/summary')),
+        axios.get(buildApiUrl('lots-in/stats/summary')),
+        axios.get(buildApiUrl('checks/stats/summary')),
+        axios.get(buildApiUrl('foods/stats/summary'))
       ]);
 
       setStats({

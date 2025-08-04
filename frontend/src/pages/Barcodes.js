@@ -37,6 +37,7 @@ import {
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon
 } from '@mui/icons-material';
+import { API_ENDPOINTS, buildApiUrl } from '../config/api';
 
 const Barcodes = () => {
   const [gtinCodes, setGtinCodes] = useState([]);
@@ -69,7 +70,7 @@ const Barcodes = () => {
   const fetchGtinCodes = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3001/api/barcodes');
+      const response = await fetch(API_ENDPOINTS.BARCODES);
       if (!response.ok) throw new Error('Failed to fetch GTIN codes');
       const data = await response.json();
       setGtinCodes(data);
@@ -82,7 +83,7 @@ const Barcodes = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/barcodes/stats/summary');
+      const response = await fetch(buildApiUrl('barcodes/stats/summary'));
       if (!response.ok) throw new Error('Failed to fetch stats');
       const data = await response.json();
       setStats(data);
@@ -95,8 +96,8 @@ const Barcodes = () => {
     e.preventDefault();
     try {
       const url = editingGtin 
-        ? `http://localhost:3001/api/barcodes/${editingGtin.id}`
-        : 'http://localhost:3001/api/barcodes';
+        ? `${API_ENDPOINTS.BARCODES}/${editingGtin.id}`
+        : API_ENDPOINTS.BARCODES;
       
       const method = editingGtin ? 'PUT' : 'POST';
       
@@ -125,7 +126,7 @@ const Barcodes = () => {
     if (!window.confirm('Are you sure you want to delete this GTIN?')) return;
     
     try {
-      const response = await fetch(`http://localhost:3001/api/barcodes/${id}`, {
+      const response = await fetch(`${API_ENDPOINTS.BARCODES}/${id}`, {
         method: 'DELETE'
       });
 
@@ -158,7 +159,7 @@ const Barcodes = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:3001/api/barcodes/validate', {
+      const response = await fetch(buildApiUrl('barcodes/validate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: validationCode })
@@ -183,7 +184,7 @@ const Barcodes = () => {
     }
 
     try {
-      const response = await fetch(`http://localhost:3001/api/barcodes/generate/next?prefix=${generationData.prefix}&startNumber=${generationData.startNumber}`);
+      const response = await fetch(buildApiUrl(`barcodes/generate/next?prefix=${generationData.prefix}&startNumber=${generationData.startNumber}`));
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Generation failed');

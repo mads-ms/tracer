@@ -4,6 +4,9 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const bodyParser = require('body-parser');
 
+// Database configuration
+const { getDatabase } = require('./database/adapter');
+
 // Import routes
 const suppliersRoutes = require('./routes/suppliers');
 const customersRoutes = require('./routes/customers');
@@ -34,7 +37,7 @@ app.use(limiter);
 // CORS configuration
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://yourdomain.com'] 
+    ? [process.env.CORS_ORIGIN || 'https://haccp-trace-frontend.onrender.com'] 
     : ['http://localhost:3000'],
   credentials: true
 }));
@@ -85,11 +88,29 @@ app.use('*', (req, res) => {
   res.status(404).json({ error: 'Endpoint not found' });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`HACCP Trace Backend Server running on port ${PORT}`);
-  console.log(`Health check: http://localhost:${PORT}/health`);
-  console.log(`API Base URL: http://localhost:${PORT}/api`);
-});
+// Initialize database and start server
+const startServer = async () => {
+  try {
+    // Get database instance
+    const database = getDatabase();
+    
+    // Initialize database tables
+    await database.initialize();
+    
+    // Start server
+    app.listen(PORT, () => {
+      console.log(`HACCP Trace Backend Server running on port ${PORT}`);
+      console.log(`Health check: http://localhost:${PORT}/health`);
+      console.log(`API Base URL: http://localhost:${PORT}/api`);
+      console.log(`Environment: ${process.env.NODE_ENV}`);
+      console.log(`Database: ${database.type}`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+startServer();
 
 module.exports = app; 

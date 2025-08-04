@@ -3,6 +3,7 @@ import { FaPlus, FaEdit, FaTrash, FaSearch } from 'react-icons/fa';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import './Checks.css';
+import { API_ENDPOINTS, buildApiUrl } from '../config/api';
 
 const Checks = () => {
   const [checks, setChecks] = useState([]);
@@ -28,7 +29,7 @@ const Checks = () => {
   const fetchChecks = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/checks');
+      const response = await axios.get(API_ENDPOINTS.CHECKS);
       setChecks(response.data);
     } catch (error) {
       toast.error('Failed to load quality checks');
@@ -39,7 +40,7 @@ const Checks = () => {
 
   const fetchLots = async () => {
     try {
-      const response = await axios.get('/api/lots-in');
+      const response = await axios.get(API_ENDPOINTS.LOTS_IN);
       setLots(response.data);
     } catch (error) {
       toast.error('Failed to load lots');
@@ -50,10 +51,10 @@ const Checks = () => {
     e.preventDefault();
     try {
       if (editingCheck) {
-        await axios.put(`/api/checks/${editingCheck.id}`, formData);
+        await axios.put(`${API_ENDPOINTS.CHECKS}/${editingCheck.id}`, formData);
         toast.success('Quality check updated successfully');
       } else {
-        await axios.post('/api/checks', formData);
+        await axios.post(API_ENDPOINTS.CHECKS, formData);
         toast.success('Quality check created successfully');
       }
       setShowForm(false);
@@ -81,7 +82,7 @@ const Checks = () => {
   const handleDelete = async (check) => {
     if (window.confirm(`Are you sure you want to delete protocol "${check.protocol}"?`)) {
       try {
-        await axios.delete(`/api/checks/${check.id}`);
+        await axios.delete(`${API_ENDPOINTS.CHECKS}/${check.id}`);
         toast.success('Quality check deleted successfully');
         fetchChecks();
       } catch (error) {

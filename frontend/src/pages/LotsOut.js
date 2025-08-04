@@ -34,6 +34,7 @@ import {
   Search as SearchIcon,
   Refresh as RefreshIcon
 } from '@mui/icons-material';
+import { API_ENDPOINTS, buildApiUrl } from '../config/api';
 
 const LotsOut = () => {
   const [lots, setLots] = useState([]);
@@ -66,7 +67,7 @@ const LotsOut = () => {
   const fetchLots = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3001/api/lots-out');
+      const response = await fetch(API_ENDPOINTS.LOTS_OUT);
       if (!response.ok) throw new Error('Failed to fetch lots');
       const data = await response.json();
       setLots(data);
@@ -79,7 +80,7 @@ const LotsOut = () => {
 
   const fetchFoods = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/foods/processed');
+      const response = await fetch(buildApiUrl('foods/processed'));
       if (!response.ok) throw new Error('Failed to fetch foods');
       const data = await response.json();
       setFoods(data);
@@ -90,7 +91,7 @@ const LotsOut = () => {
 
   const fetchIncomingLots = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/lots-in');
+      const response = await fetch(API_ENDPOINTS.LOTS_IN);
       if (!response.ok) throw new Error('Failed to fetch incoming lots');
       const data = await response.json();
       setIncomingLots(data);
@@ -101,7 +102,7 @@ const LotsOut = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/lots-out');
+      const response = await fetch(API_ENDPOINTS.LOTS_OUT);
       if (!response.ok) throw new Error('Failed to fetch stats');
       const data = await response.json();
       
@@ -124,8 +125,8 @@ const LotsOut = () => {
     e.preventDefault();
     try {
       const url = editingLot 
-        ? `http://localhost:3001/api/lots-out/${editingLot.id}`
-        : 'http://localhost:3001/api/lots-out';
+        ? `${API_ENDPOINTS.LOTS_OUT}/${editingLot.id}`
+        : API_ENDPOINTS.LOTS_OUT;
       
       const method = editingLot ? 'PUT' : 'POST';
       
@@ -154,7 +155,7 @@ const LotsOut = () => {
     if (!window.confirm('Are you sure you want to delete this lot?')) return;
     
     try {
-      const response = await fetch(`http://localhost:3001/api/lots-out/${id}`, {
+      const response = await fetch(`${API_ENDPOINTS.LOTS_OUT}/${id}`, {
         method: 'DELETE'
       });
 

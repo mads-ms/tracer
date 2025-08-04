@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FaPlus, FaEdit, FaTrash, FaSearch } from 'react-icons/fa';
 import axios from 'axios';
+import { API_ENDPOINTS, buildApiUrl } from '../config/api';
 import { toast } from 'react-toastify';
 import './Suppliers.css';
 
@@ -24,7 +25,7 @@ const Suppliers = () => {
   const fetchSuppliers = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/suppliers');
+      const response = await axios.get(API_ENDPOINTS.SUPPLIERS);
       setSuppliers(response.data);
     } catch (error) {
       console.error('Error fetching suppliers:', error);
@@ -39,10 +40,10 @@ const Suppliers = () => {
     
     try {
       if (editingSupplier) {
-        await axios.put(`/api/suppliers/${editingSupplier.id}`, formData);
+        await axios.put(`${API_ENDPOINTS.SUPPLIERS}/${editingSupplier.id}`, formData);
         toast.success('Supplier updated successfully');
       } else {
-        await axios.post('/api/suppliers', formData);
+        await axios.post(API_ENDPOINTS.SUPPLIERS, formData);
         toast.success('Supplier created successfully');
       }
       
@@ -70,7 +71,7 @@ const Suppliers = () => {
   const handleDelete = async (supplier) => {
     if (window.confirm(`Are you sure you want to delete supplier "${supplier.name}"?`)) {
       try {
-        await axios.delete(`/api/suppliers/${supplier.id}`);
+        await axios.delete(`${API_ENDPOINTS.SUPPLIERS}/${supplier.id}`);
         toast.success('Supplier deleted successfully');
         fetchSuppliers();
       } catch (error) {

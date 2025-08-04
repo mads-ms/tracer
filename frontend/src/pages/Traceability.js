@@ -34,6 +34,7 @@ import {
   DateRange as DateRangeIcon,
   Download as DownloadIcon
 } from '@mui/icons-material';
+import { API_ENDPOINTS, buildApiUrl } from '../config/api';
 
 const Traceability = () => {
   const [tabValue, setTabValue] = useState(0);
@@ -68,16 +69,16 @@ const Traceability = () => {
       let url = '';
       switch (searchType) {
         case 'lot':
-          url = `http://localhost:3001/api/traceability/lot/${searchValue}?type=in`;
+          url = buildApiUrl(`traceability/lot/${searchValue}?type=in`);
           break;
         case 'gtin':
-          url = `http://localhost:3001/api/traceability/gtin/${searchValue}`;
+          url = buildApiUrl(`traceability/gtin/${searchValue}`);
           break;
         case 'customer':
-          url = `http://localhost:3001/api/traceability/customer/${searchValue}`;
+          url = buildApiUrl(`traceability/customer/${searchValue}`);
           break;
         case 'supplier':
-          url = `http://localhost:3001/api/traceability/supplier/${searchValue}`;
+          url = buildApiUrl(`traceability/supplier/${searchValue}`);
           break;
         default:
           throw new Error('Invalid search type');
@@ -109,7 +110,7 @@ const Traceability = () => {
     setReportData(null);
 
     try {
-      const response = await fetch(`http://localhost:3001/api/traceability/date-range/${startDate}/${endDate}`);
+      const response = await fetch(buildApiUrl(`traceability/date-range/${startDate}/${endDate}`));
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to fetch date range data');
@@ -126,7 +127,7 @@ const Traceability = () => {
 
   const handleExport = async (format) => {
     try {
-      const response = await fetch(`http://localhost:3001/api/traceability/export/${format}`);
+      const response = await fetch(buildApiUrl(`traceability/export/${format}`));
       if (!response.ok) throw new Error('Export failed');
       
       const blob = await response.blob();
