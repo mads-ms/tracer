@@ -1943,6 +1943,7 @@ var D1Database = class {
       await this.createCheckCategoryTable();
       await this.createBarcodeTable();
       await this.createTraceabilityTable();
+      await this.migrateTables();
       await this.insertDefaultData();
       console.log("D1 database initialized successfully");
     } catch (error) {
@@ -2121,20 +2122,8 @@ var D1Database = class {
     `).run();
   }
   async createCheckTable() {
-    await this.d1.prepare(`
-      CREATE TABLE IF NOT EXISTS quality_check (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        description TEXT,
-        frequency TEXT,
-        fk_check_type INTEGER,
-        fk_check_category INTEGER,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (fk_check_type) REFERENCES check_type (id),
-        FOREIGN KEY (fk_check_category) REFERENCES check_category (id)
-      )
-    `).run();
+    await this.migrateQualityCheckTable();
+    console.log("createCheckTable completed - table creation handled by migration");
   }
   async createCheckResultTable() {
     await this.d1.prepare(`
@@ -2207,6 +2196,124 @@ var D1Database = class {
       )
     `).run();
   }
+  async migrateTables() {
+    try {
+      console.log("Checking for table migrations...");
+    } catch (error) {
+      console.error("Error during table migrations:", error);
+    }
+  }
+  async migrateQualityCheckTable() {
+    try {
+      console.log("Checking quality_check table for migration...");
+      let tableExists = false;
+      try {
+        const tableInfo = await this.d1.prepare("PRAGMA table_info(quality_check)").all();
+        tableExists = true;
+        const columns = tableInfo.results.map((col) => col.name);
+        console.log("Current quality_check columns:", columns);
+        if (columns.includes("name") && columns.includes("description") && columns.includes("frequency")) {
+          console.log("Migrating quality_check table to new schema...");
+          const existingRecords = await this.d1.prepare("SELECT COUNT(*) as count FROM quality_check").first();
+          const hasData = existingRecords && existingRecords.count > 0;
+          if (hasData) {
+            console.log("Table has existing data, using ALTER TABLE approach...");
+            try {
+              await this.d1.prepare("ALTER TABLE quality_check ADD COLUMN fk_lot_in INTEGER").run();
+            } catch (e) {
+              console.log("Column fk_lot_in already exists or error:", e.message);
+            }
+            try {
+              await this.d1.prepare("ALTER TABLE quality_check ADD COLUMN date TEXT").run();
+            } catch (e) {
+              console.log("Column date already exists or error:", e.message);
+            }
+            try {
+              await this.d1.prepare("ALTER TABLE quality_check ADD COLUMN protocol TEXT").run();
+            } catch (e) {
+              console.log("Column protocol already exists or error:", e.message);
+            }
+            try {
+              await this.d1.prepare("ALTER TABLE quality_check ADD COLUMN qt_controlled REAL").run();
+            } catch (e) {
+              console.log("Column qt_controlled already exists or error:", e.message);
+            }
+            try {
+              await this.d1.prepare("ALTER TABLE quality_check ADD COLUMN qt_non_compliant INTEGER").run();
+            } catch (e) {
+              console.log("Column qt_non_compliant already exists or error:", e.message);
+            }
+            try {
+              await this.d1.prepare("ALTER TABLE quality_check ADD COLUMN dim_calib TEXT").run();
+            } catch (e) {
+              console.log("Column dim_calib already exists or error:", e.message);
+            }
+            try {
+              await this.d1.prepare("ALTER TABLE quality_check DROP COLUMN name").run();
+            } catch (e) {
+              console.log("Column name already dropped or error:", e.message);
+            }
+            try {
+              await this.d1.prepare("ALTER TABLE quality_check DROP COLUMN description").run();
+            } catch (e) {
+              console.log("Column description already dropped or error:", e.message);
+            }
+            try {
+              await this.d1.prepare("ALTER TABLE quality_check DROP COLUMN frequency").run();
+            } catch (e) {
+              console.log("Column frequency already dropped or error:", e.message);
+            }
+            try {
+              await this.d1.prepare("ALTER TABLE quality_check DROP COLUMN fk_check_type").run();
+            } catch (e) {
+              console.log("Column fk_check_type already dropped or error:", e.message);
+            }
+            try {
+              await this.d1.prepare("ALTER TABLE quality_check DROP COLUMN fk_check_category").run();
+            } catch (e) {
+              console.log("Column fk_check_category already dropped or error:", e.message);
+            }
+            console.log("quality_check table migrated using ALTER TABLE approach");
+          } else {
+            console.log("Table has no data, recreating with new schema...");
+            await this.d1.prepare("DROP TABLE quality_check").run();
+            tableExists = false;
+            console.log("quality_check table dropped for recreation");
+          }
+        } else if (columns.includes("fk_lot_in") && columns.includes("protocol")) {
+          console.log("quality_check table already has new schema");
+        } else {
+          console.log("quality_check table has unknown schema, will be created fresh");
+          tableExists = false;
+        }
+      } catch (tableError) {
+        console.log("quality_check table does not exist, will be created fresh");
+        tableExists = false;
+      }
+      if (!tableExists) {
+        console.log("Creating quality_check table with new schema...");
+        await this.d1.prepare(`
+          CREATE TABLE quality_check (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fk_lot_in INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            protocol TEXT NOT NULL UNIQUE,
+            qt_controlled REAL NOT NULL,
+            qt_non_compliant INTEGER NOT NULL,
+            dim_calib TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (fk_lot_in) REFERENCES lot_in (id)
+          )
+        `).run();
+        console.log("quality_check table created successfully with new schema");
+      }
+      return tableExists;
+    } catch (error) {
+      console.error("Error during quality_check table migration:", error);
+      return false;
+    }
+  }
   async insertDefaultData() {
     await this.d1.prepare(`
       INSERT OR IGNORE INTO company (id, name, vat, address, city, country, phone, email, website)
@@ -2246,6 +2353,22 @@ var D1Database = class {
         meta: result.meta
       };
     } catch (error) {
+      if (error.message && error.message.includes("no such table")) {
+        console.log("Table missing, attempting to initialize database...");
+        try {
+          await this.initialize();
+          const stmt = this.d1.prepare(sql);
+          const result = await stmt.bind(...params).run();
+          return {
+            id: result.meta?.last_row_id,
+            changes: result.meta?.changes || 0,
+            meta: result.meta
+          };
+        } catch (initError) {
+          console.error("Failed to initialize database:", initError);
+          throw error;
+        }
+      }
       console.error("Error running query:", error);
       throw error;
     }
@@ -2827,26 +2950,160 @@ var lots_in_default = router3;
 
 // routes/checks.js
 var router4 = new Hono2();
+router4.get("/test", (c) => {
+  return c.json({ message: "Checks route is working!" });
+});
+router4.get("/test-db", async (c) => {
+  try {
+    const database = c.get("database");
+    if (!database) {
+      return c.json({ error: "Database not available" }, 500);
+    }
+    const result = await database.runQuery("SELECT 1 as test");
+    return c.json({
+      message: "Database connection works!",
+      testResult: result,
+      databaseType: typeof database,
+      methods: Object.getOwnPropertyNames(database)
+    });
+  } catch (error) {
+    console.error("Database test error:", error);
+    return c.json({
+      error: "Database test failed",
+      details: error.message,
+      stack: error.stack
+    }, 500);
+  }
+});
+router4.use("*", async (c, next) => {
+  try {
+    console.log("Migration middleware running...");
+    const database = c.get("database");
+    console.log("Database object:", database ? "exists" : "missing");
+    if (database && typeof database.migrateQualityCheckTable === "function") {
+      console.log("Calling migrateQualityCheckTable...");
+      await database.migrateQualityCheckTable();
+      console.log("Migration completed");
+    } else {
+      console.log("migrateQualityCheckTable method not found");
+      console.log("Database methods:", Object.getOwnPropertyNames(database || {}));
+    }
+  } catch (error) {
+    console.error("Error in migration middleware:", error);
+    console.error("Error stack:", error.stack);
+  }
+  await next();
+});
 router4.get("/", async (c) => {
   try {
     const database = c.get("database");
     if (!database) {
       return c.json({ error: "Database not available" }, 500);
     }
-    const checks = await database.getAll(`
-      SELECT 
-        c.*,
-        ct.name as check_type_name,
-        cc.name as check_category_name
-      FROM quality_check c
-      LEFT JOIN check_type ct ON c.fk_check_type = ct.id
-      LEFT JOIN check_category cc ON c.fk_check_category = cc.id
-      ORDER BY c.created_at DESC
-    `);
-    return c.json(checks);
+    console.log("Database object type:", typeof database);
+    console.log("Database methods:", Object.getOwnPropertyNames(database));
+    try {
+      console.log("Attempting to get table info...");
+      const tableInfo = await database.getAll("PRAGMA table_info(quality_check)");
+      console.log("Table info received:", tableInfo);
+      const hasNewSchema = tableInfo.some((col) => col.name === "fk_lot_in");
+      console.log("Has new schema:", hasNewSchema);
+      if (hasNewSchema) {
+        console.log("Using new schema query...");
+        const checks = await database.getAll(`
+          SELECT 
+            c.*,
+            l.lot_number,
+            l.quantity as lot_quantity,
+            l.unit as lot_unit,
+            s.name as supplier_name,
+            f.name as food_name
+          FROM quality_check c
+          LEFT JOIN lot_in l ON c.fk_lot_in = l.id
+          LEFT JOIN supplier s ON l.supplier_id = s.id
+          LEFT JOIN food_in f ON l.food_id = f.id
+          ORDER BY c.created_at DESC
+        `);
+        console.log("New schema query successful, returning", checks.length, "checks");
+        return c.json(checks);
+      } else {
+        console.log("Using old schema temporarily");
+        const checks = await database.getAll(`
+          SELECT 
+            c.*,
+            'N/A' as lot_number,
+            'N/A' as supplier_name,
+            'N/A' as food_name
+          FROM quality_check c
+          ORDER BY c.created_at DESC
+        `);
+        console.log("Old schema query successful, returning", checks.length, "checks");
+        return c.json(checks);
+      }
+    } catch (error) {
+      console.error("Error checking table structure:", error);
+      console.error("Error stack:", error.stack);
+      return c.json({
+        error: "Failed to check table structure",
+        details: error.message,
+        stack: error.stack
+      }, 500);
+    }
   } catch (error) {
-    console.error("Error fetching checks:", error);
-    return c.json({ error: "Failed to fetch checks" }, 500);
+    console.error("Error in main GET route:", error);
+    console.error("Error stack:", error.stack);
+    return c.json({
+      error: "Failed to fetch checks",
+      details: error.message,
+      stack: error.stack
+    }, 500);
+  }
+});
+router4.post("/migrate", async (c) => {
+  try {
+    const database = c.get("database");
+    if (!database) {
+      return c.json({ error: "Database not available" }, 500);
+    }
+    console.log("Manual migration triggered");
+    if (typeof database.migrateQualityCheckTable === "function") {
+      console.log("Calling migrateQualityCheckTable...");
+      await database.migrateQualityCheckTable();
+      console.log("Manual migration completed");
+      return c.json({ message: "Migration completed successfully" });
+    } else {
+      console.log("Migration method not available");
+      console.log("Available methods:", Object.getOwnPropertyNames(database));
+      return c.json({ error: "Migration method not available" }, 500);
+    }
+  } catch (error) {
+    console.error("Manual migration error:", error);
+    return c.json({ error: "Migration failed", details: error.message }, 500);
+  }
+});
+router4.get("/debug/structure", async (c) => {
+  try {
+    const database = c.get("database");
+    if (!database) {
+      return c.json({ error: "Database not available" }, 500);
+    }
+    const tableInfo = await database.getAll("PRAGMA table_info(quality_check)");
+    const columns = tableInfo.map((col) => ({
+      name: col.name,
+      type: col.type,
+      notnull: col.notnull,
+      pk: col.pk
+    }));
+    return c.json({
+      tableName: "quality_check",
+      columns,
+      columnCount: columns.length,
+      hasNewSchema: columns.some((col) => col.name === "fk_lot_in"),
+      hasOldSchema: columns.some((col) => col.name === "name")
+    });
+  } catch (error) {
+    console.error("Debug structure error:", error);
+    return c.json({ error: "Failed to get table structure", details: error.message }, 500);
   }
 });
 router4.get("/:id", async (c) => {
@@ -2858,11 +3115,15 @@ router4.get("/:id", async (c) => {
     const check = await database.getRow(`
       SELECT 
         c.*,
-        ct.name as check_type_name,
-        cc.name as check_category_name
+        l.lot_number,
+        l.quantity as lot_quantity,
+        l.unit as lot_unit,
+        s.name as supplier_name,
+        f.name as food_name
       FROM quality_check c
-      LEFT JOIN check_type ct ON c.fk_check_type = ct.id
-      LEFT JOIN check_category cc ON c.fk_check_category = cc.id
+      LEFT JOIN lot_in l ON c.fk_lot_in = l.id
+      LEFT JOIN supplier s ON l.supplier_id = s.id
+      LEFT JOIN food_in f ON l.food_id = f.id
       WHERE c.id = ?
     `, [c.req.param("id")]);
     if (!check) {
@@ -2881,22 +3142,30 @@ router4.post("/", async (c) => {
       return c.json({ error: "Database not available" }, 500);
     }
     const body = await c.req.json();
-    const { name, description, frequency, fk_check_type, fk_check_category } = body;
-    if (!name) {
-      return c.json({ error: "Name is required" }, 400);
+    const { fk_lot_in, date, protocol, qt_controlled, qt_non_compliant, dim_calib } = body;
+    if (!fk_lot_in || !date || !protocol || qt_controlled === void 0 || qt_non_compliant === void 0 || !dim_calib) {
+      return c.json({ error: "All fields are required" }, 400);
+    }
+    const existingProtocol = await database.getRow("SELECT id FROM quality_check WHERE protocol = ?", [protocol]);
+    if (existingProtocol) {
+      return c.json({ error: "Protocol number already exists" }, 400);
     }
     const result = await database.runQuery(
-      "INSERT INTO quality_check (name, description, frequency, fk_check_type, fk_check_category) VALUES (?, ?, ?, ?, ?)",
-      [name, description || null, frequency || null, fk_check_type || null, fk_check_category || null]
+      "INSERT INTO quality_check (fk_lot_in, date, protocol, qt_controlled, qt_non_compliant, dim_calib) VALUES (?, ?, ?, ?, ?, ?)",
+      [fk_lot_in, date, protocol, qt_controlled, qt_non_compliant, dim_calib]
     );
     const newCheck = await database.getRow(`
       SELECT 
         c.*,
-        ct.name as check_type_name,
-        cc.name as check_category_name
+        l.lot_number,
+        l.quantity as lot_quantity,
+        l.unit as lot_unit,
+        s.name as supplier_name,
+        f.name as food_name
       FROM quality_check c
-      LEFT JOIN check_type ct ON c.fk_check_type = ct.id
-      LEFT JOIN check_category cc ON c.fk_check_category = cc.id
+      LEFT JOIN lot_in l ON c.fk_lot_in = l.id
+      LEFT JOIN supplier s ON l.supplier_id = s.id
+      LEFT JOIN food_in f ON l.food_id = f.id
       WHERE c.id = ?
     `, [result.id]);
     return c.json(newCheck, 201);
@@ -2912,27 +3181,35 @@ router4.put("/:id", async (c) => {
       return c.json({ error: "Database not available" }, 500);
     }
     const body = await c.req.json();
-    const { name, description, frequency, fk_check_type, fk_check_category } = body;
+    const { fk_lot_in, date, protocol, qt_controlled, qt_non_compliant, dim_calib } = body;
     const checkId = c.req.param("id");
-    if (!name) {
-      return c.json({ error: "Name is required" }, 400);
+    if (!fk_lot_in || !date || !protocol || qt_controlled === void 0 || qt_non_compliant === void 0 || !dim_calib) {
+      return c.json({ error: "All fields are required" }, 400);
     }
     const existingCheck = await database.getRow("SELECT id FROM quality_check WHERE id = ?", [checkId]);
     if (!existingCheck) {
       return c.json({ error: "Check not found" }, 404);
     }
+    const existingProtocol = await database.getRow("SELECT id FROM quality_check WHERE protocol = ? AND id != ?", [protocol, checkId]);
+    if (existingProtocol) {
+      return c.json({ error: "Protocol number already exists" }, 400);
+    }
     await database.runQuery(
-      "UPDATE quality_check SET name = ?, description = ?, frequency = ?, fk_check_type = ?, fk_check_category = ? WHERE id = ?",
-      [name, description || null, frequency || null, fk_check_type || null, fk_check_category || null, checkId]
+      "UPDATE quality_check SET fk_lot_in = ?, date = ?, protocol = ?, qt_controlled = ?, qt_non_compliant = ?, dim_calib = ? WHERE id = ?",
+      [fk_lot_in, date, protocol, qt_controlled, qt_non_compliant, dim_calib, checkId]
     );
     const updatedCheck = await database.getRow(`
       SELECT 
         c.*,
-        ct.name as check_type_name,
-        cc.name as check_category_name
+        l.lot_number,
+        l.quantity as lot_quantity,
+        l.unit as lot_unit,
+        s.name as supplier_name,
+        f.name as food_name
       FROM quality_check c
-      LEFT JOIN check_type ct ON c.fk_check_type = ct.id
-      LEFT JOIN check_category cc ON c.fk_check_category = cc.id
+      LEFT JOIN lot_in l ON c.fk_lot_in = l.id
+      LEFT JOIN supplier s ON l.supplier_id = s.id
+      LEFT JOIN food_in f ON l.food_id = f.id
       WHERE c.id = ?
     `, [checkId]);
     return c.json(updatedCheck);
@@ -2992,6 +3269,39 @@ var checks_default = router4;
 var router5 = new Hono2();
 router5.get("/test", (c) => {
   return c.json({ message: "Test route works!" });
+});
+router5.get("/db-test", async (c) => {
+  try {
+    const database = c.get("database");
+    if (!database) {
+      return c.json({ error: "Database not available" }, 500);
+    }
+    const result = await database.runQuery("SELECT 1 as test");
+    let foodOutTableExists = false;
+    try {
+      await database.runQuery("SELECT COUNT(*) FROM food_out");
+      foodOutTableExists = true;
+    } catch (tableError) {
+      console.log("food_out table check error:", tableError.message);
+      foodOutTableExists = false;
+    }
+    return c.json({
+      message: "Database connection works!",
+      testResult: result,
+      databaseType: database.type || "unknown",
+      foodOutTableExists,
+      tables: {
+        foodOut: foodOutTableExists
+      }
+    });
+  } catch (error) {
+    console.error("Database test error:", error);
+    return c.json({
+      error: "Database test failed",
+      details: error.message,
+      stack: error.stack
+    }, 500);
+  }
 });
 router5.get("/list", async (c) => {
   try {
@@ -3098,28 +3408,76 @@ router5.post("/raw", async (c) => {
 });
 router5.post("/processed", async (c) => {
   try {
+    console.log("POST /processed endpoint called");
     const database = c.get("database");
+    console.log("Database object:", database ? "exists" : "missing");
     if (!database) {
+      console.error("Database not available in context");
       return c.json({ error: "Database not available" }, 500);
     }
-    const body = await c.req.json();
+    try {
+      await database.runQuery("SELECT COUNT(*) FROM food_out");
+      console.log("food_out table exists");
+    } catch (tableError) {
+      console.error("food_out table does not exist:", tableError.message);
+      return c.json({
+        error: "Required table food_out does not exist",
+        details: tableError.message
+      }, 500);
+    }
+    console.log("Request headers:", c.req.header());
+    console.log("Request content-type:", c.req.header("content-type"));
+    console.log("Request content-length:", c.req.header("content-length"));
+    let body;
+    try {
+      body = await c.req.json();
+      console.log("Request body parsed successfully:", body);
+      console.log("Body type:", typeof body);
+      console.log("Body keys:", Object.keys(body));
+    } catch (jsonError) {
+      console.error("JSON parsing error:", jsonError);
+      console.error("Raw request body type:", typeof c.req.body);
+      try {
+        const rawText = await c.req.text();
+        console.log("Raw request body as text:", rawText);
+        return c.json({
+          error: "Invalid JSON in request body",
+          details: jsonError.message,
+          rawBody: rawText
+        }, 400);
+      } catch (textError) {
+        console.error("Could not read request body as text:", textError);
+        return c.json({
+          error: "Could not read request body",
+          details: jsonError.message
+        }, 400);
+      }
+    }
     const { name, description, category } = body;
     if (!name) {
+      console.error("Name is required but missing");
       return c.json({ error: "Name is required" }, 400);
     }
+    console.log("Checking if food name already exists...");
     const existingFood = await database.getRow("SELECT id FROM food_out WHERE name = ?", [name]);
+    console.log("Existing food check result:", existingFood);
     if (existingFood) {
+      console.error("Food with this name already exists");
       return c.json({ error: "Food with this name already exists" }, 400);
     }
+    console.log("Inserting new processed food...");
     const result = await database.runQuery(
       "INSERT INTO food_out (name, description, category) VALUES (?, ?, ?)",
       [name, description || null, category || null]
     );
+    console.log("Insert result:", result);
     if (!result || !result.id) {
+      console.log("No ID returned, trying to fetch by name...");
       const newFood2 = await database.getRow(
         "SELECT * FROM food_out WHERE name = ? ORDER BY created_at DESC LIMIT 1",
         [name]
       );
+      console.log("Fetched food by name:", newFood2);
       if (newFood2) {
         return c.json(newFood2, 201);
       } else {
@@ -3129,11 +3487,14 @@ router5.post("/processed", async (c) => {
         }, 201);
       }
     }
+    console.log("Fetching newly created food by ID...");
     const newFood = await database.getRow("SELECT * FROM food_out WHERE id = ?", [result.id]);
+    console.log("New food by ID:", newFood);
     return c.json(newFood, 201);
   } catch (error) {
     console.error("Error creating processed food:", error);
-    return c.json({ error: "Failed to create processed food" }, 500);
+    console.error("Error stack:", error.stack);
+    return c.json({ error: "Failed to create processed food", details: error.message }, 500);
   }
 });
 router5.get("/stats/summary", async (c) => {
@@ -4284,15 +4645,17 @@ app.get("/health", (c) => {
 });
 app.use("*", async (c, next) => {
   if (c.env.DB) {
-    const d1Db = new d1_default(c.env.DB);
-    c.set("database", d1Db);
     try {
-      await d1Db.initialize();
+      const d1Db = new d1_default(c.env.DB);
+      c.set("database", d1Db);
+      await next();
     } catch (error) {
-      console.error("Database initialization error:", error);
+      console.error("Database middleware error:", error);
+      return c.json({ error: "Database middleware failed" }, 500);
     }
+  } else {
+    await next();
   }
-  await next();
 });
 app.route("/api/suppliers", suppliers_default);
 app.route("/api/customers", customers_default);

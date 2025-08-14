@@ -452,44 +452,60 @@ const Packages = () => {
         </DialogTitle>
         <form onSubmit={handleSubmit}>
           <DialogContent>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
+            <Grid container spacing={3} sx={{ width: '100%' }}>
+              {/* First row: Type and Description (2 inputs) */}
+              <Grid item xs={12} md={6} sx={{ minWidth: '50%' }}>
                 <TextField
                   fullWidth
                   label="Type"
                   value={formData.type}
                   onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                   required
-                  margin="normal"
+                  size="medium"
+                  sx={{ width: '100%' }}
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12} md={6} sx={{ minWidth: '50%' }}>
                 <TextField
                   fullWidth
                   label="Description"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   required
-                  margin="normal"
+                  size="medium"
+                  multiline
+                  rows={2}
+                  sx={{ width: '100%' }}
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+              
+              {/* Second row: Measure and Barcode (2 inputs) */}
+              <Grid item xs={12} md={6} sx={{ minWidth: '50%' }}>
                 <TextField
                   fullWidth
                   label="Measure"
                   value={formData.measure}
                   onChange={(e) => setFormData({ ...formData, measure: e.target.value })}
                   required
-                  margin="normal"
+                  size="medium"
+                  sx={{ width: '100%' }}
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
+              <Grid item xs={12} md={6} sx={{ minWidth: '50%' }}>
+                <FormControl fullWidth size="medium" sx={{ width: '100%' }}>
                   <InputLabel>Barcode (Optional)</InputLabel>
                   <Select
                     value={formData.fk_barcode}
                     onChange={(e) => setFormData({ ...formData, fk_barcode: e.target.value })}
                     label="Barcode (Optional)"
+                    MenuProps={{
+                      PaperProps: {
+                        style: {
+                          maxHeight: 300,
+                          minWidth: 300
+                        }
+                      }
+                    }}
                   >
                     <MenuItem value="">
                       <em>No Barcode</em>
@@ -502,7 +518,9 @@ const Packages = () => {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={12} sm={6}>
+              
+              {/* Third row: Switches (2 inputs) */}
+              <Grid item xs={12} md={6} sx={{ minWidth: '50%' }}>
                 <FormControlLabel
                   control={
                     <Switch
@@ -511,10 +529,10 @@ const Packages = () => {
                     />
                   }
                   label="More Information"
-                  margin="normal"
+                  sx={{ width: '100%' }}
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12} md={6} sx={{ minWidth: '50%' }}>
                 <FormControlLabel
                   control={
                     <Switch
@@ -523,7 +541,7 @@ const Packages = () => {
                     />
                   }
                   label="Variable"
-                  margin="normal"
+                  sx={{ width: '100%' }}
                 />
               </Grid>
             </Grid>
@@ -561,8 +579,8 @@ const Packages = () => {
                   <React.Fragment key={food.id}>
                     <ListItem>
                       <ListItemText
-                        primary={food.food_name}
-                        secondary={`Unit: ${food.unit_measure} | Source: ${food.source}`}
+                        primary={food.name}
+                        secondary={`Category: ${food.category || 'N/A'} | Supplier: ${food.supplier_name || 'N/A'}`}
                       />
                     </ListItem>
                     {index < rawFoods.length - 1 && <Divider />}
@@ -583,8 +601,8 @@ const Packages = () => {
                   <React.Fragment key={food.id}>
                     <ListItem>
                       <ListItemText
-                        primary={food.food_name}
-                        secondary={`Unit: ${food.unit_measure} | GTIN: ${food.gtin_code || 'N/A'}`}
+                        primary={food.name}
+                        secondary={`Category: ${food.category || 'N/A'} | Description: ${food.description || 'N/A'}`}
                       />
                     </ListItem>
                     {index < processedFoods.length - 1 && <Divider />}

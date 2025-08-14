@@ -53,17 +53,21 @@ app.get('/health', (c) => {
 // Database initialization middleware
 app.use('*', async (c, next) => {
   if (c.env.DB) {
-    const d1Db = new D1Database(c.env.DB);
-    c.set('database', d1Db);
-    
-    // Initialize database on first request
     try {
-      await d1Db.initialize();
+      const d1Db = new D1Database(c.env.DB);
+      c.set('database', d1Db);
+      
+      // Note: In Cloudflare Workers, we can't maintain state between requests
+      // So we need to check if tables exist on each request, but we can optimize this
+      // by only running initialization if we get a database error
+      await next();
     } catch (error) {
-      console.error('Database initialization error:', error);
+      console.error('Database middleware error:', error);
+      return c.json({ error: 'Database middleware failed' }, 500);
     }
+  } else {
+    await next();
   }
-  await next();
 });
 
 // API routes

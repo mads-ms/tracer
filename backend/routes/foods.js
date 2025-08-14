@@ -7,6 +7,46 @@ router.get('/test', (c) => {
   return c.json({ message: 'Test route works!' });
 });
 
+// Database test route
+router.get('/db-test', async (c) => {
+  try {
+    const database = c.get('database');
+    if (!database) {
+      return c.json({ error: 'Database not available' }, 500);
+    }
+    
+    // Try to create a test table to see if database operations work
+    const result = await database.runQuery('SELECT 1 as test');
+    
+    // Check if food_out table exists
+    let foodOutTableExists = false;
+    try {
+      await database.runQuery('SELECT COUNT(*) FROM food_out');
+      foodOutTableExists = true;
+    } catch (tableError) {
+      console.log('food_out table check error:', tableError.message);
+      foodOutTableExists = false;
+    }
+    
+    return c.json({ 
+      message: 'Database connection works!', 
+      testResult: result,
+      databaseType: database.type || 'unknown',
+      foodOutTableExists,
+      tables: {
+        foodOut: foodOutTableExists
+      }
+    });
+  } catch (error) {
+    console.error('Database test error:', error);
+    return c.json({ 
+      error: 'Database test failed', 
+      details: error.message,
+      stack: error.stack
+    }, 500);
+  }
+});
+
 // List all foods (both raw and processed)
 router.get('/list', async (c) => {
   try {
@@ -135,37 +175,96 @@ router.post('/raw', async (c) => {
 // Create new processed food (food_out)
 router.post('/processed', async (c) => {
   try {
+    console.log('POST /processed endpoint called');
+    
     const database = c.get('database');
+    console.log('Database object:', database ? 'exists' : 'missing');
+    
     if (!database) {
+      console.error('Database not available in context');
       return c.json({ error: 'Database not available' }, 500);
     }
     
-    const body = await c.req.json();
+    // Check if food_out table exists
+    try {
+      await database.runQuery('SELECT COUNT(*) FROM food_out');
+      console.log('food_out table exists');
+    } catch (tableError) {
+      console.error('food_out table does not exist:', tableError.message);
+      return c.json({ 
+        error: 'Required table food_out does not exist', 
+        details: tableError.message 
+      }, 500);
+    }
+    
+    // Debug the raw request
+    console.log('Request headers:', c.req.header());
+    console.log('Request content-type:', c.req.header('content-type'));
+    console.log('Request content-length:', c.req.header('content-length'));
+    
+    let body;
+    try {
+      body = await c.req.json();
+      console.log('Request body parsed successfully:', body);
+      console.log('Body type:', typeof body);
+      console.log('Body keys:', Object.keys(body));
+    } catch (jsonError) {
+      console.error('JSON parsing error:', jsonError);
+      console.error('Raw request body type:', typeof c.req.body);
+      
+      // Try to get the raw text
+      try {
+        const rawText = await c.req.text();
+        console.log('Raw request body as text:', rawText);
+        return c.json({ 
+          error: 'Invalid JSON in request body', 
+          details: jsonError.message,
+          rawBody: rawText
+        }, 400);
+      } catch (textError) {
+        console.error('Could not read request body as text:', textError);
+        return c.json({ 
+          error: 'Could not read request body', 
+          details: jsonError.message
+        }, 400);
+      }
+    }
+    
     const { name, description, category } = body;
     
     // Validate required fields
     if (!name) {
+      console.error('Name is required but missing');
       return c.json({ error: 'Name is required' }, 400);
     }
 
+    console.log('Checking if food name already exists...');
     // Check if food name already exists
     const existingFood = await database.getRow('SELECT id FROM food_out WHERE name = ?', [name]);
+    console.log('Existing food check result:', existingFood);
+    
     if (existingFood) {
+      console.error('Food with this name already exists');
       return c.json({ error: 'Food with this name already exists' }, 400);
     }
 
+    console.log('Inserting new processed food...');
     const result = await database.runQuery(
       'INSERT INTO food_out (name, description, category) VALUES (?, ?, ?)',
       [name, description || null, category || null]
     );
+    console.log('Insert result:', result);
 
     // Check if we got a valid result
     if (!result || !result.id) {
+      console.log('No ID returned, trying to fetch by name...');
       // If we can't get the ID, try to fetch the food by name
       const newFood = await database.getRow(
         'SELECT * FROM food_out WHERE name = ? ORDER BY created_at DESC LIMIT 1',
         [name]
       );
+      console.log('Fetched food by name:', newFood);
+      
       if (newFood) {
         return c.json(newFood, 201);
       } else {
@@ -176,11 +275,15 @@ router.post('/processed', async (c) => {
       }
     }
 
+    console.log('Fetching newly created food by ID...');
     const newFood = await database.getRow('SELECT * FROM food_out WHERE id = ?', [result.id]);
+    console.log('New food by ID:', newFood);
+    
     return c.json(newFood, 201);
   } catch (error) {
     console.error('Error creating processed food:', error);
-    return c.json({ error: 'Failed to create processed food' }, 500);
+    console.error('Error stack:', error.stack);
+    return c.json({ error: 'Failed to create processed food', details: error.message }, 500);
   }
 });
 

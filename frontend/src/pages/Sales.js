@@ -463,18 +463,20 @@ const Sales = () => {
         </DialogTitle>
         <form onSubmit={handleSubmit}>
           <DialogContent>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
+            <Grid container spacing={3} sx={{ width: '100%' }}>
+              {/* First row: Invoice Number and Date (2 inputs) */}
+              <Grid item xs={12} md={6} sx={{ minWidth: '50%' }}>
                 <TextField
                   fullWidth
                   label="Invoice Number"
                   value={formData.invoice_number}
                   onChange={(e) => setFormData({ ...formData, invoice_number: e.target.value })}
                   required
-                  margin="normal"
+                  size="medium"
+                  sx={{ width: '100%' }}
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12} md={6} sx={{ minWidth: '50%' }}>
                 <TextField
                   fullWidth
                   label="Invoice Date"
@@ -482,12 +484,15 @@ const Sales = () => {
                   value={formData.invoice_date}
                   onChange={(e) => setFormData({ ...formData, invoice_date: e.target.value })}
                   required
-                  margin="normal"
+                  size="medium"
                   InputLabelProps={{ shrink: true }}
+                  sx={{ width: '100%' }}
                 />
               </Grid>
-              <Grid item xs={12}>
-                <FormControl fullWidth margin="normal" required>
+              
+              {/* Second row: Customer (full width) */}
+              <Grid item xs={12} sx={{ width: '100%' }}>
+                <FormControl fullWidth size="medium" required sx={{ width: '100%' }}>
                   <InputLabel>Customer</InputLabel>
                   <Select
                     value={formData.fk_customer}
@@ -503,14 +508,16 @@ const Sales = () => {
                 </FormControl>
               </Grid>
               
-              <Grid item xs={12}>
+              {/* Third row: Product Selection Header */}
+              <Grid item xs={12} sx={{ width: '100%' }}>
                 <Typography variant="h6" sx={{ mt: 2, mb: 1 }}>
                   Product Selection (Select at least one)
                 </Typography>
               </Grid>
               
-              <Grid item xs={12} sm={4}>
-                <FormControl fullWidth margin="normal">
+              {/* Fourth row: Processed Food and Raw Material (2 inputs) */}
+              <Grid item xs={12} md={6} sx={{ minWidth: '50%' }}>
+                <FormControl fullWidth size="medium" sx={{ width: '100%' }}>
                   <InputLabel>Processed Food (Lot Out)</InputLabel>
                   <Select
                     value={formData.fk_lot_out}
@@ -529,8 +536,8 @@ const Sales = () => {
                 </FormControl>
               </Grid>
               
-              <Grid item xs={12} sm={4}>
-                <FormControl fullWidth margin="normal">
+              <Grid item xs={12} md={6} sx={{ minWidth: '50%' }}>
+                <FormControl fullWidth size="medium" sx={{ width: '100%' }}>
                   <InputLabel>Raw Material (Lot In)</InputLabel>
                   <Select
                     value={formData.fk_lot_in}
@@ -549,8 +556,9 @@ const Sales = () => {
                 </FormControl>
               </Grid>
               
-              <Grid item xs={12} sm={4}>
-                <FormControl fullWidth margin="normal">
+              {/* Fifth row: Package (full width) */}
+              <Grid item xs={12} sx={{ width: '100%' }}>
+                <FormControl fullWidth size="medium" sx={{ width: '100%' }}>
                   <InputLabel>Package</InputLabel>
                   <Select
                     value={formData.fk_package}

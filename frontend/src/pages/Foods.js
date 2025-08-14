@@ -202,7 +202,7 @@ const Foods = () => {
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: editProcessed
+        body: JSON.stringify(editProcessed)
       });
 
       if (!response.ok) {
@@ -460,8 +460,9 @@ const Foods = () => {
         </DialogTitle>
         <form onSubmit={handleRawSubmit}>
           <DialogContent sx={{ pt: 2 }}>
-            <Grid container spacing={3}>
-              <Grid item xs={12}>
+            <Grid container spacing={3} sx={{ width: '100%' }}>
+              {/* First row: Name (full width) */}
+              <Grid item xs={12} sx={{ width: '100%' }}>
                 <TextField
                   fullWidth
                   label="Name *"
@@ -469,9 +470,12 @@ const Foods = () => {
                   onChange={(e) => setEditRaw({...editRaw, name: e.target.value})}
                   required
                   size="medium"
+                  sx={{ width: '100%' }}
                 />
               </Grid>
-              <Grid item xs={12}>
+              
+              {/* Second row: Description (full width) */}
+              <Grid item xs={12} sx={{ width: '100%' }}>
                 <TextField
                   fullWidth
                   label="Description"
@@ -480,19 +484,23 @@ const Foods = () => {
                   multiline
                   rows={4}
                   size="medium"
+                  sx={{ width: '100%' }}
                 />
               </Grid>
-              <Grid item xs={12} md={6}>
+              
+              {/* Third row: Category and Supplier (2 inputs) */}
+              <Grid item xs={12} md={6} sx={{ minWidth: '50%' }}>
                 <TextField
                   fullWidth
                   label="Category"
                   value={editRaw.category}
                   onChange={(e) => setEditRaw({...editRaw, category: e.target.value})}
                   size="medium"
+                  sx={{ width: '100%' }}
                 />
               </Grid>
-              <Grid item xs={12} md={6}>
-                <FormControl fullWidth size="medium">
+              <Grid item xs={12} md={6} sx={{ minWidth: '50%' }}>
+                <FormControl fullWidth size="medium" sx={{ width: '100%' }}>
                   <InputLabel id="supplier-label">Supplier</InputLabel>
                   <Select
                     labelId="supplier-label"
@@ -542,8 +550,9 @@ const Foods = () => {
         </DialogTitle>
         <form onSubmit={handleProcessedSubmit}>
           <DialogContent sx={{ pt: 2 }}>
-            <Grid container spacing={3}>
-              <Grid item xs={12}>
+            <Grid container spacing={3} sx={{ width: '100%' }}>
+              {/* First row: Name (full width) */}
+              <Grid item xs={12} sx={{ width: '100%' }}>
                 <TextField
                   fullWidth
                   label="Name *"
@@ -551,9 +560,12 @@ const Foods = () => {
                   onChange={(e) => setEditProcessed({...editProcessed, name: e.target.value})}
                   required
                   size="medium"
+                  sx={{ width: '100%' }}
                 />
               </Grid>
-              <Grid item xs={12}>
+              
+              {/* Second row: Description (full width) */}
+              <Grid item xs={12} sx={{ width: '100%' }}>
                 <TextField
                   fullWidth
                   label="Description"
@@ -562,15 +574,19 @@ const Foods = () => {
                   multiline
                   rows={4}
                   size="medium"
+                  sx={{ width: '100%' }}
                 />
               </Grid>
-              <Grid item xs={12}>
+              
+              {/* Third row: Category (full width) */}
+              <Grid item xs={12} sx={{ width: '100%' }}>
                 <TextField
                   fullWidth
                   label="Category"
                   value={editProcessed.category}
                   onChange={(e) => setEditProcessed({...editProcessed, category: e.target.value})}
                   size="medium"
+                  sx={{ width: '100%' }}
                 />
               </Grid>
             </Grid>

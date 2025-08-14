@@ -365,7 +365,8 @@ const LotsOut = () => {
         </DialogTitle>
         <DialogContent>
           <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
-            <Grid container spacing={2}>
+            <Grid container spacing={3}>
+              {/* First row: Lot Number and Quantity (2 inputs) */}
               <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
@@ -373,6 +374,7 @@ const LotsOut = () => {
                   value={formData.lot_number}
                   onChange={(e) => setFormData({...formData, lot_number: e.target.value})}
                   required
+                  size="medium"
                 />
               </Grid>
               <Grid item xs={12} md={6}>
@@ -384,8 +386,11 @@ const LotsOut = () => {
                   value={formData.quantity}
                   onChange={(e) => setFormData({...formData, quantity: e.target.value})}
                   required
+                  size="medium"
                 />
               </Grid>
+              
+              {/* Second row: Unit and Food Item (2 inputs) */}
               <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
@@ -394,10 +399,11 @@ const LotsOut = () => {
                   onChange={(e) => setFormData({...formData, unit: e.target.value})}
                   placeholder="e.g., kg, liters, pieces"
                   required
+                  size="medium"
                 />
               </Grid>
               <Grid item xs={12} md={6}>
-                <FormControl fullWidth required>
+                <FormControl fullWidth required size="medium">
                   <InputLabel>Food Item *</InputLabel>
                   <Select
                     value={formData.food_id}
@@ -412,6 +418,8 @@ const LotsOut = () => {
                   </Select>
                 </FormControl>
               </Grid>
+              
+              {/* Third row: Production Date and Expiry Date (2 inputs) */}
               <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
@@ -420,6 +428,7 @@ const LotsOut = () => {
                   value={formData.production_date}
                   onChange={(e) => setFormData({...formData, production_date: e.target.value})}
                   InputLabelProps={{ shrink: true }}
+                  size="medium"
                 />
               </Grid>
               <Grid item xs={12} md={6}>
@@ -430,6 +439,7 @@ const LotsOut = () => {
                   value={formData.expiry_date}
                   onChange={(e) => setFormData({...formData, expiry_date: e.target.value})}
                   InputLabelProps={{ shrink: true }}
+                  size="medium"
                 />
               </Grid>
             </Grid>

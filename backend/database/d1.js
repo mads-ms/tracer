@@ -29,6 +29,9 @@ class D1Database {
       await this.createBarcodeTable();
       await this.createTraceabilityTable();
       
+      // Migrate existing tables if needed
+      await this.migrateTables();
+      
       // Insert default data
       await this.insertDefaultData();
       
@@ -221,20 +224,11 @@ class D1Database {
   }
 
   async createCheckTable() {
-    await this.d1.prepare(`
-      CREATE TABLE IF NOT EXISTS quality_check (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        description TEXT,
-        frequency TEXT,
-        fk_check_type INTEGER,
-        fk_check_category INTEGER,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (fk_check_type) REFERENCES check_type (id),
-        FOREIGN KEY (fk_check_category) REFERENCES check_category (id)
-      )
-    `).run();
+    // Always check if migration is needed, even if table exists
+    await this.migrateQualityCheckTable();
+    
+    // Table creation is now handled by migration
+    console.log('createCheckTable completed - table creation handled by migration');
   }
 
   async createCheckResultTable() {
@@ -313,6 +307,162 @@ class D1Database {
     `).run();
   }
 
+  async migrateTables() {
+    try {
+      console.log('Checking for table migrations...');
+      
+      // Other table migrations can go here in the future
+      
+    } catch (error) {
+      console.error('Error during table migrations:', error);
+      // Continue with initialization even if migration fails
+    }
+  }
+
+  async migrateQualityCheckTable() {
+    try {
+      console.log('Checking quality_check table for migration...');
+      
+      // Check if quality_check table exists and what schema it has
+      let tableExists = false;
+      try {
+        const tableInfo = await this.d1.prepare("PRAGMA table_info(quality_check)").all();
+        tableExists = true;
+        const columns = tableInfo.results.map(col => col.name);
+        
+        console.log('Current quality_check columns:', columns);
+        
+        // If table has old schema (name, description, frequency columns)
+        if (columns.includes('name') && columns.includes('description') && columns.includes('frequency')) {
+          console.log('Migrating quality_check table to new schema...');
+          
+          // Check if there are any existing records
+          const existingRecords = await this.d1.prepare('SELECT COUNT(*) as count FROM quality_check').first();
+          const hasData = existingRecords && existingRecords.count > 0;
+          
+          if (hasData) {
+            console.log('Table has existing data, using ALTER TABLE approach...');
+            
+            // Add new columns to existing table
+            try {
+              await this.d1.prepare('ALTER TABLE quality_check ADD COLUMN fk_lot_in INTEGER').run();
+            } catch (e) {
+              console.log('Column fk_lot_in already exists or error:', e.message);
+            }
+            
+            try {
+              await this.d1.prepare('ALTER TABLE quality_check ADD COLUMN date TEXT').run();
+            } catch (e) {
+              console.log('Column date already exists or error:', e.message);
+            }
+            
+            try {
+              await this.d1.prepare('ALTER TABLE quality_check ADD COLUMN protocol TEXT').run();
+            } catch (e) {
+              console.log('Column protocol already exists or error:', e.message);
+            }
+            
+            try {
+              await this.d1.prepare('ALTER TABLE quality_check ADD COLUMN qt_controlled REAL').run();
+            } catch (e) {
+              console.log('Column qt_controlled already exists or error:', e.message);
+            }
+            
+            try {
+              await this.d1.prepare('ALTER TABLE quality_check ADD COLUMN qt_non_compliant INTEGER').run();
+            } catch (e) {
+              console.log('Column qt_non_compliant already exists or error:', e.message);
+            }
+            
+            try {
+              await this.d1.prepare('ALTER TABLE quality_check ADD COLUMN dim_calib TEXT').run();
+            } catch (e) {
+              console.log('Column dim_calib already exists or error:', e.message);
+            }
+            
+            // Drop old columns that are no longer needed
+            try {
+              await this.d1.prepare('ALTER TABLE quality_check DROP COLUMN name').run();
+            } catch (e) {
+              console.log('Column name already dropped or error:', e.message);
+            }
+            
+            try {
+              await this.d1.prepare('ALTER TABLE quality_check DROP COLUMN description').run();
+            } catch (e) {
+              console.log('Column description already dropped or error:', e.message);
+            }
+            
+            try {
+              await this.d1.prepare('ALTER TABLE quality_check DROP COLUMN frequency').run();
+            } catch (e) {
+              console.log('Column frequency already dropped or error:', e.message);
+            }
+            
+            try {
+              await this.d1.prepare('ALTER TABLE quality_check DROP COLUMN fk_check_type').run();
+            } catch (e) {
+              console.log('Column fk_check_type already dropped or error:', e.message);
+            }
+            
+            try {
+              await this.d1.prepare('ALTER TABLE quality_check DROP COLUMN fk_check_category').run();
+            } catch (e) {
+              console.log('Column fk_check_category already dropped or error:', e.message);
+            }
+            
+            console.log('quality_check table migrated using ALTER TABLE approach');
+          } else {
+            console.log('Table has no data, recreating with new schema...');
+            
+            // Drop and recreate table (safe when no data exists)
+            await this.d1.prepare('DROP TABLE quality_check').run();
+            tableExists = false; // Force recreation
+            
+            console.log('quality_check table dropped for recreation');
+          }
+          
+        } else if (columns.includes('fk_lot_in') && columns.includes('protocol')) {
+          console.log('quality_check table already has new schema');
+        } else {
+          console.log('quality_check table has unknown schema, will be created fresh');
+          tableExists = false; // Force recreation
+        }
+        
+      } catch (tableError) {
+        console.log('quality_check table does not exist, will be created fresh');
+        tableExists = false;
+      }
+      
+      // If table doesn't exist or was dropped, create it with new schema
+      if (!tableExists) {
+        console.log('Creating quality_check table with new schema...');
+        await this.d1.prepare(`
+          CREATE TABLE quality_check (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fk_lot_in INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            protocol TEXT NOT NULL UNIQUE,
+            qt_controlled REAL NOT NULL,
+            qt_non_compliant INTEGER NOT NULL,
+            dim_calib TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (fk_lot_in) REFERENCES lot_in (id)
+          )
+        `).run();
+        console.log('quality_check table created successfully with new schema');
+      }
+      
+      // If table doesn't exist or was dropped, it will be created by the calling method
+      return tableExists;
+      
+    } catch (error) {
+      console.error('Error during quality_check table migration:', error);
+      return false; // Force table creation on error
+    }
+  }
+
   async insertDefaultData() {
     // Insert default company
     await this.d1.prepare(`
@@ -362,6 +512,24 @@ class D1Database {
         meta: result.meta
       };
     } catch (error) {
+      // If we get a "table doesn't exist" error, try to initialize
+      if (error.message && error.message.includes('no such table')) {
+        console.log('Table missing, attempting to initialize database...');
+        try {
+          await this.initialize();
+          // Retry the original query
+          const stmt = this.d1.prepare(sql);
+          const result = await stmt.bind(...params).run();
+          return {
+            id: result.meta?.last_row_id,
+            changes: result.meta?.changes || 0,
+            meta: result.meta
+          };
+        } catch (initError) {
+          console.error('Failed to initialize database:', initError);
+          throw error; // Throw the original error
+        }
+      }
       console.error('Error running query:', error);
       throw error;
     }
