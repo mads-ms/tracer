@@ -1,20 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { FaTruck, FaUsers, FaBoxes, FaClipboardCheck, FaUtensils, FaShoppingCart } from 'react-icons/fa';
+import { FaTruck, FaUsers, FaBoxes, FaClipboardCheck, FaUtensils, FaShoppingCart, FaSearch } from 'react-icons/fa';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './Dashboard.css';
 import { API_ENDPOINTS, buildApiUrl } from '../config/api';
 
 const Dashboard = () => {
   const [stats, setStats] = useState({
-    suppliers: { total: 0, withLots: 0 },
-    customers: { total: 0, withSales: 0 },
-    lotsIn: { total: 0, totalQuantity: 0, remainingQuantity: 0, expired: 0 },
-    checks: { total: 0, complianceRate: 100 },
-    foods: { raw: 0, processed: 0 },
+    suppliers: { totalSuppliers: 0, suppliersWithLots: 0 },
+    customers: { totalCustomers: 0, customersWithSales: 0 },
+    lotsIn: { totalLots: 0, expiredLots: 0 },
+    checks: { totalChecks: 0, complianceRate: 0 },
+    foods: { rawFoods: 0, processedFoods: 0 },
     sales: { total: 0 }
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchDashboardStats();
@@ -205,10 +207,62 @@ const Dashboard = () => {
         <div className="card">
           <h3>Quick Actions</h3>
           <div className="quick-actions">
-            <button className="btn btn-primary">Register New Lot</button>
-            <button className="btn btn-secondary">Add Supplier</button>
-            <button className="btn btn-outline">Create Food Recipe</button>
-            <button className="btn btn-outline">Run Traceability</button>
+            <div className="quick-actions-row">
+              <button 
+                className="btn btn-primary"
+                onClick={() => navigate('/lots-in')}
+              >
+                <FaBoxes /> Register New Lot
+              </button>
+              <button 
+                className="btn btn-secondary"
+                onClick={() => navigate('/suppliers')}
+              >
+                <FaTruck /> Add Supplier
+              </button>
+            </div>
+            <div className="quick-actions-row">
+              <button 
+                className="btn btn-outline"
+                onClick={() => navigate('/customers')}
+              >
+                <FaUsers /> Add Customer
+              </button>
+              <button 
+                className="btn btn-outline"
+                onClick={() => navigate('/foods')}
+              >
+                <FaUtensils /> Manage Foods
+              </button>
+            </div>
+            <div className="quick-actions-row">
+              <button 
+                className="btn btn-outline"
+                onClick={() => navigate('/checks')}
+              >
+                <FaClipboardCheck /> Quality Checks
+              </button>
+              <button 
+                className="btn btn-outline"
+                onClick={() => navigate('/traceability')}
+              >
+                <FaSearch /> Run Traceability
+              </button>
+            </div>
+            <div className="quick-actions-row">
+              <button 
+                className="btn btn-outline"
+                onClick={() => navigate('/sales')}
+              >
+                <FaShoppingCart /> Sales
+              </button>
+              <button 
+                className="btn btn-outline"
+                onClick={() => navigate('/packages')}
+              >
+                <FaBoxes /> Packages
+              </button>
+            </div>
           </div>
         </div>
       </div>

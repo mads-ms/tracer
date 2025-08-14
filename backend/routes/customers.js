@@ -1,183 +1,195 @@
-const express = require('express');
-const router = express.Router();
-const { runQuery, getRow, getAll } = require('../database/database');
+import { Hono } from 'hono';
+
+const router = new Hono();
 
 // Get all customers
-router.get('/', async (req, res) => {
+router.get('/', async (c) => {
   try {
-    const customers = await getAll(`
-      SELECT * FROM customer 
-      ORDER BY name ASC
-    `);
-    res.json(customers);
+    const database = c.get('database');
+    if (!database) {
+      return c.json({ error: 'Database not available' }, 500);
+    }
+    
+    const customers = await database.getAll('SELECT * FROM customer ORDER BY name');
+    return c.json(customers);
   } catch (error) {
     console.error('Error fetching customers:', error);
-    res.status(500).json({ error: 'Failed to fetch customers' });
+    return c.json({ error: 'Failed to fetch customers' }, 500);
   }
 });
 
 // Get customer by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', async (c) => {
   try {
-    const customer = await getRow(
-      'SELECT * FROM customer WHERE id = ?',
-      [req.params.id]
-    );
-    
-    if (!customer) {
-      return res.status(404).json({ error: 'Customer not found' });
+    const database = c.get('database');
+    if (!database) {
+      return c.json({ error: 'Database not available' }, 500);
     }
     
-    res.json(customer);
+    const customer = await database.getRow('SELECT * FROM customer WHERE id = ?', [c.req.param('id')]);
+    if (!customer) {
+      return c.json({ error: 'Customer not found' }, 404);
+    }
+    return c.json(customer);
   } catch (error) {
     console.error('Error fetching customer:', error);
-    res.status(500).json({ error: 'Failed to fetch customer' });
+    return c.json({ error: 'Failed to fetch customer' }, 500);
   }
 });
 
 // Create new customer
-router.post('/', async (req, res) => {
+router.post('/', async (c) => {
   try {
-    const { vat, name, address, cap, city, phone } = req.body;
-    
-    // Validation
-    if (!vat || !name || !address || !cap || !city || !phone) {
-      return res.status(400).json({ 
-        error: 'All fields are required: vat, name, address, cap, city, phone' 
-      });
+    const database = c.get('database');
+    if (!database) {
+      return c.json({ error: 'Database not available' }, 500);
     }
     
-    // Check if VAT already exists
-    const existingCustomer = await getRow(
-      'SELECT id FROM customer WHERE vat = ?',
-      [vat]
-    );
+    const body = await c.req.json();
+    const { name, vat, address, city, country, phone, email, website } = body;
     
-    if (existingCustomer) {
-      return res.status(400).json({ error: 'Customer with this VAT already exists' });
+    // Validate required fields
+    if (!name) {
+      return c.json({ error: 'Name is required' }, 400);
     }
-    
-    const result = await runQuery(
-      `INSERT INTO customer (vat, name, address, cap, city, phone) 
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [vat, name, address, cap, city, phone]
+
+    // Check if VAT already exists (if provided)
+    if (vat) {
+      const existingCustomer = await database.getRow('SELECT id FROM customer WHERE vat = ?', [vat]);
+      if (existingCustomer) {
+        return c.json({ error: 'Customer with this VAT already exists' }, 400);
+      }
+    }
+
+    const result = await database.runQuery(
+      'INSERT INTO customer (name, vat, address, city, country, phone, email, website) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [name, vat || null, address || null, city || null, country || null, phone || null, email || null, website || null]
     );
-    
-    const newCustomer = await getRow(
-      'SELECT * FROM customer WHERE id = ?',
-      [result.lastID]
-    );
-    
-    res.status(201).json(newCustomer);
+
+    // Check if we got a valid result
+    if (!result || !result.id) {
+      // If we can't get the ID, try to fetch the customer by name and VAT
+      const newCustomer = await database.getRow(
+        'SELECT * FROM customer WHERE name = ? AND vat = ? ORDER BY created_at DESC LIMIT 1',
+        [name, vat || null]
+      );
+      if (newCustomer) {
+        return c.json(newCustomer, 201);
+      } else {
+        return c.json({ 
+          message: 'Customer created successfully but could not retrieve details',
+          success: true 
+        }, 201);
+      }
+    }
+
+    const newCustomer = await database.getRow('SELECT * FROM customer WHERE id = ?', [result.id]);
+    return c.json(newCustomer, 201);
   } catch (error) {
     console.error('Error creating customer:', error);
-    res.status(500).json({ error: 'Failed to create customer' });
+    return c.json({ error: 'Failed to create customer' }, 500);
   }
 });
 
 // Update customer
-router.put('/:id', async (req, res) => {
+router.put('/:id', async (c) => {
   try {
-    const { vat, name, address, cap, city, phone } = req.body;
-    const customerId = req.params.id;
-    
-    // Validation
-    if (!vat || !name || !address || !cap || !city || !phone) {
-      return res.status(400).json({ 
-        error: 'All fields are required: vat, name, address, cap, city, phone' 
-      });
+    const database = c.get('database');
+    if (!database) {
+      return c.json({ error: 'Database not available' }, 500);
     }
     
+    const body = await c.req.json();
+    const { name, vat, address, city, country, phone, email, website } = body;
+    const customerId = c.req.param('id');
+
+    // Validate required fields
+    if (!name) {
+      return c.json({ error: 'Name is required' }, 400);
+    }
+
     // Check if customer exists
-    const existingCustomer = await getRow(
-      'SELECT id FROM customer WHERE id = ?',
-      [customerId]
-    );
-    
+    const existingCustomer = await database.getRow('SELECT id FROM customer WHERE id = ?', [customerId]);
     if (!existingCustomer) {
-      return res.status(404).json({ error: 'Customer not found' });
+      return c.json({ error: 'Customer not found' }, 404);
     }
-    
-    // Check if VAT already exists for another customer
-    const duplicateVat = await getRow(
-      'SELECT id FROM customer WHERE vat = ? AND id != ?',
-      [vat, customerId]
-    );
-    
-    if (duplicateVat) {
-      return res.status(400).json({ error: 'Customer with this VAT already exists' });
+
+    // Check if VAT already exists for another customer (if provided)
+    if (vat) {
+      const duplicateVat = await database.getRow('SELECT id FROM customer WHERE vat = ? AND id != ?', [vat, customerId]);
+      if (duplicateVat) {
+        return c.json({ error: 'Customer with this VAT already exists' }, 400);
+      }
     }
-    
-    await runQuery(
-      `UPDATE customer 
-       SET vat = ?, name = ?, address = ?, cap = ?, city = ?, phone = ?
-       WHERE id = ?`,
-      [vat, name, address, cap, city, phone, customerId]
+
+    await database.runQuery(
+      'UPDATE customer SET name = ?, vat = ?, address = ?, city = ?, country = ?, phone = ?, email = ?, website = ? WHERE id = ?',
+      [name, vat || null, address || null, city || null, country || null, phone || null, email || null, website || null, customerId]
     );
-    
-    const updatedCustomer = await getRow(
-      'SELECT * FROM customer WHERE id = ?',
-      [customerId]
-    );
-    
-    res.json(updatedCustomer);
+
+    const updatedCustomer = await database.getRow('SELECT * FROM customer WHERE id = ?', [customerId]);
+    return c.json(updatedCustomer);
   } catch (error) {
     console.error('Error updating customer:', error);
-    res.status(500).json({ error: 'Failed to update customer' });
+    return c.json({ error: 'Failed to update customer' }, 500);
   }
 });
 
 // Delete customer
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', async (c) => {
   try {
-    const customerId = req.params.id;
+    const database = c.get('database');
+    if (!database) {
+      return c.json({ error: 'Database not available' }, 500);
+    }
     
+    const customerId = c.req.param('id');
+
     // Check if customer exists
-    const existingCustomer = await getRow(
-      'SELECT id FROM customer WHERE id = ?',
-      [customerId]
-    );
-    
+    const existingCustomer = await database.getRow('SELECT id FROM customer WHERE id = ?', [customerId]);
     if (!existingCustomer) {
-      return res.status(404).json({ error: 'Customer not found' });
+      return c.json({ error: 'Customer not found' }, 404);
     }
-    
+
     // Check if customer is referenced in sales
-    const salesCount = await getRow(
-      'SELECT COUNT(*) as count FROM sell WHERE fk_customer = ?',
-      [customerId]
-    );
-    
-    if (salesCount.count > 0) {
-      return res.status(400).json({ 
-        error: 'Cannot delete customer: they have associated sales records' 
-      });
+    const referencedInSales = await database.getRow('SELECT id FROM sell WHERE fk_customer = ? LIMIT 1', [customerId]);
+    if (referencedInSales) {
+      return c.json({ error: 'Cannot delete customer: referenced in sales' }, 400);
     }
-    
-    await runQuery('DELETE FROM customer WHERE id = ?', [customerId]);
-    
-    res.json({ message: 'Customer deleted successfully' });
+
+    await database.runQuery('DELETE FROM customer WHERE id = ?', [customerId]);
+    return c.json({ message: 'Customer deleted successfully' });
   } catch (error) {
     console.error('Error deleting customer:', error);
-    res.status(500).json({ error: 'Failed to delete customer' });
+    return c.json({ error: 'Failed to delete customer' }, 500);
   }
 });
 
-// Search customers
-router.get('/search/:query', async (req, res) => {
+// Get customer statistics for dashboard
+router.get('/stats/summary', async (c) => {
   try {
-    const query = `%${req.params.query}%`;
-    const customers = await getAll(`
-      SELECT * FROM customer 
-      WHERE name LIKE ? OR vat LIKE ? OR city LIKE ?
-      ORDER BY name ASC
-    `, [query, query, query]);
+    const database = c.get('database');
+    if (!database) {
+      return c.json({ error: 'Database not available' }, 500);
+    }
     
-    res.json(customers);
+    // Get total customers count
+    const totalCustomersResult = await database.getRow('SELECT COUNT(*) as count FROM customer');
+    const totalCustomers = totalCustomersResult.count || 0;
+    
+    // Get customers with sales count
+    const customersWithSalesResult = await database.getRow('SELECT COUNT(DISTINCT fk_customer) as count FROM sell WHERE fk_customer IS NOT NULL');
+    const customersWithSales = customersWithSalesResult.count || 0;
+    
+    return c.json({
+      totalCustomers,
+      customersWithSales,
+      customersWithoutSales: totalCustomers - customersWithSales
+    });
   } catch (error) {
-    console.error('Error searching customers:', error);
-    res.status(500).json({ error: 'Failed to search customers' });
+    console.error('Error fetching customer stats:', error);
+    return c.json({ error: 'Failed to fetch customer statistics' }, 500);
   }
 });
 
-module.exports = router; 
+export default router; 

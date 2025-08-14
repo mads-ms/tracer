@@ -1,571 +1,321 @@
-const express = require('express');
-const router = express.Router();
-const { runQuery, getRow, getAll } = require('../database/database');
+import { Hono } from 'hono';
 
-// Get all sales with detailed information
-router.get('/', async (req, res) => {
+const router = new Hono();
+
+// Get all sales
+router.get('/', async (c) => {
   try {
-    const sales = await getAll(`
+    const database = c.get('database');
+    if (!database) {
+      return c.json({ error: 'Database not available' }, 500);
+    }
+    
+    const sales = await database.getAll(`
       SELECT 
         s.*,
         c.name as customer_name,
-        c.vat as customer_vat,
-        c.city as customer_city,
-        lo.lot_number as lot_out_number,
-        lo.creation_date as lot_out_creation_date,
-        fo.name as lot_out_food_name,
-        li.lot_number as lot_in_number,
-        li.acceptance_date as lot_in_acceptance_date,
-        fi.name as lot_in_food_name,
-        p.type as package_type,
-        p.description as package_description,
-        p.measure as package_measure
+        c.vat as customer_vat
       FROM sell s
       LEFT JOIN customer c ON s.fk_customer = c.id
-      LEFT JOIN lot_out lo ON s.fk_lot_out = lo.id
-      LEFT JOIN food_out fo ON lo.fk_food_out = fo.id
-      LEFT JOIN lot_in li ON s.fk_lot_in = li.id
-      LEFT JOIN food_in fi ON li.fk_food_in = fi.id
-      LEFT JOIN package p ON s.fk_package = p.id
-      ORDER BY s.invoice_date DESC, s.invoice_number DESC
+      ORDER BY s.invoice_date DESC
     `);
-    res.json(sales);
+    return c.json(sales);
   } catch (error) {
     console.error('Error fetching sales:', error);
-    res.status(500).json({ error: 'Failed to fetch sales' });
+    return c.json({ error: 'Failed to fetch sales' }, 500);
   }
 });
 
 // Get sale by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', async (c) => {
   try {
-    const sale = await getRow(`
+    const database = c.get('database');
+    if (!database) {
+      return c.json({ error: 'Database not available' }, 500);
+    }
+    
+    const sale = await database.getRow(`
       SELECT 
         s.*,
         c.name as customer_name,
         c.vat as customer_vat,
         c.address as customer_address,
-        c.cap as customer_cap,
-        c.city as customer_city,
-        c.phone as customer_phone,
-        lo.lot_number as lot_out_number,
-        lo.creation_date as lot_out_creation_date,
-        lo.expiry_date as lot_out_expiry_date,
-        lo.quantity_of_food as lot_out_quantity,
-        fo.name as lot_out_food_name,
-        fo.unit_measure as lot_out_unit_measure,
-        g_out.code as lot_out_gtin_code,
-        li.lot_number as lot_in_number,
-        li.acceptance_date as lot_in_acceptance_date,
-        li.ddt_number as lot_in_ddt_number,
-        li.quantity as lot_in_quantity,
-        fi.name as lot_in_food_name,
-        fi.unit_measure as lot_in_unit_measure,
-        fi.source as lot_in_source,
-        s_in.name as lot_in_supplier_name,
-        p.type as package_type,
-        p.description as package_description,
-        p.measure as package_measure,
-        g_pkg.code as package_gtin_code
+        c.city as customer_city
       FROM sell s
       LEFT JOIN customer c ON s.fk_customer = c.id
-      LEFT JOIN lot_out lo ON s.fk_lot_out = lo.id
-      LEFT JOIN food_out fo ON lo.fk_food_out = fo.id
-      LEFT JOIN gtin_13 g_out ON fo.fk_gtin = g_out.id
-      LEFT JOIN lot_in li ON s.fk_lot_in = li.id
-      LEFT JOIN food_in fi ON li.fk_food_in = fi.id
-      LEFT JOIN supplier s_in ON li.fk_supplier = s_in.id
-      LEFT JOIN package p ON s.fk_package = p.id
-      LEFT JOIN gtin_13 g_pkg ON p.fk_gtin = g_pkg.id
       WHERE s.id = ?
-    `, [req.params.id]);
+    `, [c.req.param('id')]);
     
     if (!sale) {
-      return res.status(404).json({ error: 'Sale not found' });
+      return c.json({ error: 'Sale not found' }, 404);
     }
-    
-    res.json(sale);
+    return c.json(sale);
   } catch (error) {
     console.error('Error fetching sale:', error);
-    res.status(500).json({ error: 'Failed to fetch sale' });
+    return c.json({ error: 'Failed to fetch sale' }, 500);
   }
 });
 
 // Create new sale
-router.post('/', async (req, res) => {
+router.post('/', async (c) => {
   try {
-    const {
-      invoice_number,
-      invoice_date,
-      fk_lot_out,
-      fk_lot_in,
-      fk_package,
-      fk_customer
-    } = req.body;
+    const database = c.get('database');
+    if (!database) {
+      return c.json({ error: 'Database not available' }, 500);
+    }
     
-    // Validation
+    const body = await c.req.json();
+    const { 
+      invoice_number, 
+      invoice_date, 
+      fk_lot_out, 
+      fk_lot_in, 
+      fk_package, 
+      fk_customer 
+    } = body;
+    
+    // Validate required fields
     if (!invoice_number || !invoice_date || !fk_customer) {
-      return res.status(400).json({ 
-        error: 'Required fields: invoice_number, invoice_date, fk_customer' 
-      });
+      return c.json({ error: 'Invoice number, date, and customer are required' }, 400);
     }
-    
-    // At least one product must be specified
-    if (!fk_lot_out && !fk_lot_in && !fk_package) {
-      return res.status(400).json({ 
-        error: 'At least one product must be specified: fk_lot_out, fk_lot_in, or fk_package' 
-      });
-    }
-    
+
     // Check if invoice number already exists
-    const existingInvoice = await getRow(
-      'SELECT id FROM sell WHERE invoice_number = ?',
-      [invoice_number]
-    );
-    
+    const existingInvoice = await database.getRow('SELECT id FROM sell WHERE invoice_number = ?', [invoice_number]);
     if (existingInvoice) {
-      return res.status(400).json({ error: 'Invoice number already exists' });
+      return c.json({ error: 'Invoice number already exists' }, 400);
     }
-    
+
     // Check if customer exists
-    const customer = await getRow(
-      'SELECT id FROM customer WHERE id = ?',
-      [fk_customer]
-    );
-    
+    const customer = await database.getRow('SELECT id FROM customer WHERE id = ?', [fk_customer]);
     if (!customer) {
-      return res.status(400).json({ error: 'Customer not found' });
+      return c.json({ error: 'Customer not found' }, 400);
     }
-    
+
     // Check if lot_out exists (if provided)
     if (fk_lot_out) {
-      const lotOut = await getRow(
-        'SELECT id FROM lot_out WHERE id = ?',
-        [fk_lot_out]
-      );
-      
+      const lotOut = await database.getRow('SELECT id FROM lot_out WHERE id = ?', [fk_lot_out]);
       if (!lotOut) {
-        return res.status(400).json({ error: 'Outgoing lot not found' });
+        return c.json({ error: 'Outgoing lot not found' }, 400);
       }
     }
-    
+
     // Check if lot_in exists (if provided)
     if (fk_lot_in) {
-      const lotIn = await getRow(
-        'SELECT id FROM lot_in WHERE id = ?',
-        [fk_lot_in]
-      );
-      
+      const lotIn = await database.getRow('SELECT id FROM lot_in WHERE id = ?', [fk_lot_in]);
       if (!lotIn) {
-        return res.status(400).json({ error: 'Incoming lot not found' });
+        return c.json({ error: 'Incoming lot not found' }, 400);
       }
     }
-    
+
     // Check if package exists (if provided)
     if (fk_package) {
-      const package = await getRow(
-        'SELECT id FROM package WHERE id = ?',
-        [fk_package]
-      );
-      
-      if (!package) {
-        return res.status(400).json({ error: 'Package not found' });
+      const packageItem = await database.getRow('SELECT id FROM package WHERE id = ?', [fk_package]);
+      if (!packageItem) {
+        return c.json({ error: 'Package not found' }, 400);
       }
     }
-    
-    const result = await runQuery(
-      `INSERT INTO sell (
-        invoice_number, invoice_date, fk_lot_out, fk_lot_in, fk_package, fk_customer
-      ) VALUES (?, ?, ?, ?, ?, ?)`,
+
+    const result = await database.runQuery(
+      'INSERT INTO sell (invoice_number, invoice_date, fk_lot_out, fk_lot_in, fk_package, fk_customer) VALUES (?, ?, ?, ?, ?, ?)',
       [invoice_number, invoice_date, fk_lot_out || null, fk_lot_in || null, fk_package || null, fk_customer]
     );
-    
-    const newSale = await getRow(`
+
+    // Check if we got a valid result
+    if (!result || !result.id) {
+      // If we can't get the ID, try to fetch the sale by invoice_number
+      const newSale = await database.getRow(
+        'SELECT * FROM sell WHERE invoice_number = ? ORDER BY created_at DESC LIMIT 1',
+        [invoice_number]
+      );
+      if (newSale) {
+        return c.json(newSale, 201);
+      } else {
+        return c.json({ 
+          message: 'Sale created successfully but could not retrieve details',
+          success: true 
+        }, 201);
+      }
+    }
+
+    const newSale = await database.getRow(`
       SELECT 
         s.*,
         c.name as customer_name,
-        c.vat as customer_vat,
-        c.city as customer_city,
-        lo.lot_number as lot_out_number,
-        lo.creation_date as lot_out_creation_date,
-        fo.name as lot_out_food_name,
-        li.lot_number as lot_in_number,
-        li.acceptance_date as lot_in_acceptance_date,
-        fi.name as lot_in_food_name,
-        p.type as package_type,
-        p.description as package_description,
-        p.measure as package_measure
+        c.vat as customer_vat
       FROM sell s
       LEFT JOIN customer c ON s.fk_customer = c.id
-      LEFT JOIN lot_out lo ON s.fk_lot_out = lo.id
-      LEFT JOIN food_out fo ON lo.fk_food_out = fo.id
-      LEFT JOIN lot_in li ON s.fk_lot_in = li.id
-      LEFT JOIN food_in fi ON li.fk_food_in = fi.id
-      LEFT JOIN package p ON s.fk_package = p.id
       WHERE s.id = ?
-    `, [result.lastID]);
+    `, [result.id]);
     
-    res.status(201).json(newSale);
+    return c.json(newSale, 201);
   } catch (error) {
     console.error('Error creating sale:', error);
-    res.status(500).json({ error: 'Failed to create sale' });
+    return c.json({ error: 'Failed to create sale' }, 500);
   }
 });
 
 // Update sale
-router.put('/:id', async (req, res) => {
+router.put('/:id', async (c) => {
   try {
-    const {
-      invoice_number,
-      invoice_date,
-      fk_lot_out,
-      fk_lot_in,
-      fk_package,
-      fk_customer
-    } = req.body;
-    const saleId = req.params.id;
+    const database = c.get('database');
+    if (!database) {
+      return c.json({ error: 'Database not available' }, 500);
+    }
     
-    // Validation
+    const body = await c.req.json();
+    const { 
+      invoice_number, 
+      invoice_date, 
+      fk_lot_out, 
+      fk_lot_in, 
+      fk_package, 
+      fk_customer 
+    } = body;
+    const saleId = c.req.param('id');
+
+    // Validate required fields
     if (!invoice_number || !invoice_date || !fk_customer) {
-      return res.status(400).json({ 
-        error: 'Required fields: invoice_number, invoice_date, fk_customer' 
-      });
+      return c.json({ error: 'Invoice number, date, and customer are required' }, 400);
     }
-    
-    // At least one product must be specified
-    if (!fk_lot_out && !fk_lot_in && !fk_package) {
-      return res.status(400).json({ 
-        error: 'At least one product must be specified: fk_lot_out, fk_lot_in, or fk_package' 
-      });
-    }
-    
+
     // Check if sale exists
-    const existingSale = await getRow(
-      'SELECT id FROM sell WHERE id = ?',
-      [saleId]
-    );
-    
+    const existingSale = await database.getRow('SELECT id FROM sell WHERE id = ?', [saleId]);
     if (!existingSale) {
-      return res.status(404).json({ error: 'Sale not found' });
+      return c.json({ error: 'Sale not found' }, 404);
     }
-    
+
     // Check if invoice number already exists for another sale
-    const duplicateInvoice = await getRow(
-      'SELECT id FROM sell WHERE invoice_number = ? AND id != ?',
-      [invoice_number, saleId]
-    );
-    
+    const duplicateInvoice = await database.getRow('SELECT id FROM sell WHERE invoice_number = ? AND id != ?', [invoice_number, saleId]);
     if (duplicateInvoice) {
-      return res.status(400).json({ error: 'Invoice number already exists' });
+      return c.json({ error: 'Invoice number already exists' }, 400);
     }
-    
+
     // Check if customer exists
-    const customer = await getRow(
-      'SELECT id FROM customer WHERE id = ?',
-      [fk_customer]
-    );
-    
+    const customer = await database.getRow('SELECT id FROM customer WHERE id = ?', [fk_customer]);
     if (!customer) {
-      return res.status(400).json({ error: 'Customer not found' });
+      return c.json({ error: 'Customer not found' }, 400);
     }
-    
+
     // Check if lot_out exists (if provided)
     if (fk_lot_out) {
-      const lotOut = await getRow(
-        'SELECT id FROM lot_out WHERE id = ?',
-        [fk_lot_out]
-      );
-      
+      const lotOut = await database.getRow('SELECT id FROM lot_out WHERE id = ?', [fk_lot_out]);
       if (!lotOut) {
-        return res.status(400).json({ error: 'Outgoing lot not found' });
+        return c.json({ error: 'Outgoing lot not found' }, 400);
       }
     }
-    
+
     // Check if lot_in exists (if provided)
     if (fk_lot_in) {
-      const lotIn = await getRow(
-        'SELECT id FROM lot_in WHERE id = ?',
-        [fk_lot_in]
-      );
-      
+      const lotIn = await database.getRow('SELECT id FROM lot_in WHERE id = ?', [fk_lot_in]);
       if (!lotIn) {
-        return res.status(400).json({ error: 'Incoming lot not found' });
+        return c.json({ error: 'Incoming lot not found' }, 400);
       }
     }
-    
+
     // Check if package exists (if provided)
     if (fk_package) {
-      const package = await getRow(
-        'SELECT id FROM package WHERE id = ?',
-        [fk_package]
-      );
-      
-      if (!package) {
-        return res.status(400).json({ error: 'Package not found' });
+      const packageItem = await database.getRow('SELECT id FROM package WHERE id = ?', [fk_package]);
+      if (!packageItem) {
+        return c.json({ error: 'Package not found' }, 400);
       }
     }
-    
-    await runQuery(
-      `UPDATE sell SET 
-        invoice_number = ?, invoice_date = ?, fk_lot_out = ?, 
-        fk_lot_in = ?, fk_package = ?, fk_customer = ?
-       WHERE id = ?`,
+
+    await database.runQuery(
+      'UPDATE sell SET invoice_number = ?, invoice_date = ?, fk_lot_out = ?, fk_lot_in = ?, fk_package = ?, fk_customer = ? WHERE id = ?',
       [invoice_number, invoice_date, fk_lot_out || null, fk_lot_in || null, fk_package || null, fk_customer, saleId]
     );
-    
-    const updatedSale = await getRow(`
+
+    const updatedSale = await database.getRow(`
       SELECT 
         s.*,
         c.name as customer_name,
-        c.vat as customer_vat,
-        c.city as customer_city,
-        lo.lot_number as lot_out_number,
-        lo.creation_date as lot_out_creation_date,
-        fo.name as lot_out_food_name,
-        li.lot_number as lot_in_number,
-        li.acceptance_date as lot_in_acceptance_date,
-        fi.name as lot_in_food_name,
-        p.type as package_type,
-        p.description as package_description,
-        p.measure as package_measure
+        c.vat as customer_vat
       FROM sell s
       LEFT JOIN customer c ON s.fk_customer = c.id
-      LEFT JOIN lot_out lo ON s.fk_lot_out = lo.id
-      LEFT JOIN food_out fo ON lo.fk_food_out = fo.id
-      LEFT JOIN lot_in li ON s.fk_lot_in = li.id
-      LEFT JOIN food_in fi ON li.fk_food_in = fi.id
-      LEFT JOIN package p ON s.fk_package = p.id
       WHERE s.id = ?
     `, [saleId]);
     
-    res.json(updatedSale);
+    return c.json(updatedSale);
   } catch (error) {
     console.error('Error updating sale:', error);
-    res.status(500).json({ error: 'Failed to update sale' });
+    return c.json({ error: 'Failed to update sale' }, 500);
   }
 });
 
 // Delete sale
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', async (c) => {
   try {
-    const saleId = req.params.id;
-    
-    // Check if sale exists
-    const existingSale = await getRow(
-      'SELECT id FROM sell WHERE id = ?',
-      [saleId]
-    );
-    
-    if (!existingSale) {
-      return res.status(404).json({ error: 'Sale not found' });
+    const database = c.get('database');
+    if (!database) {
+      return c.json({ error: 'Database not available' }, 500);
     }
     
-    await runQuery('DELETE FROM sell WHERE id = ?', [saleId]);
-    
-    res.json({ message: 'Sale deleted successfully' });
+    const saleId = c.req.param('id');
+
+    // Check if sale exists
+    const existingSale = await database.getRow('SELECT id FROM sell WHERE id = ?', [saleId]);
+    if (!existingSale) {
+      return c.json({ error: 'Sale not found' }, 404);
+    }
+
+    await database.runQuery('DELETE FROM sell WHERE id = ?', [saleId]);
+    return c.json({ message: 'Sale deleted successfully' });
   } catch (error) {
     console.error('Error deleting sale:', error);
-    res.status(500).json({ error: 'Failed to delete sale' });
+    return c.json({ error: 'Failed to delete sale' }, 500);
   }
 });
 
-// Search sales
-router.get('/search/:query', async (req, res) => {
+// Get sales statistics for dashboard
+router.get('/stats/summary', async (c) => {
   try {
-    const query = `%${req.params.query}%`;
-    const sales = await getAll(`
-      SELECT 
-        s.*,
-        c.name as customer_name,
-        c.vat as customer_vat,
-        c.city as customer_city,
-        lo.lot_number as lot_out_number,
-        lo.creation_date as lot_out_creation_date,
-        fo.name as lot_out_food_name,
-        li.lot_number as lot_in_number,
-        li.acceptance_date as lot_in_acceptance_date,
-        fi.name as lot_in_food_name,
-        p.type as package_type,
-        p.description as package_description,
-        p.measure as package_measure
-      FROM sell s
-      LEFT JOIN customer c ON s.fk_customer = c.id
-      LEFT JOIN lot_out lo ON s.fk_lot_out = lo.id
-      LEFT JOIN food_out fo ON lo.fk_food_out = fo.id
-      LEFT JOIN lot_in li ON s.fk_lot_in = li.id
-      LEFT JOIN food_in fi ON li.fk_food_in = fi.id
-      LEFT JOIN package p ON s.fk_package = p.id
-      WHERE s.invoice_number LIKE ? OR c.name LIKE ? OR c.vat LIKE ? OR 
-            lo.lot_number LIKE ? OR li.lot_number LIKE ? OR fo.name LIKE ? OR fi.name LIKE ?
-      ORDER BY s.invoice_date DESC, s.invoice_number DESC
-    `, [query, query, query, query, query, query, query]);
-    
-    res.json(sales);
-  } catch (error) {
-    console.error('Error searching sales:', error);
-    res.status(500).json({ error: 'Failed to search sales' });
-  }
-});
-
-// Get sales by customer
-router.get('/customer/:customerId', async (req, res) => {
-  try {
-    const customerId = req.params.customerId;
-    
-    // Check if customer exists
-    const customer = await getRow(
-      'SELECT id FROM customer WHERE id = ?',
-      [customerId]
-    );
-    
-    if (!customer) {
-      return res.status(404).json({ error: 'Customer not found' });
+    const database = c.get('database');
+    if (!database) {
+      return c.json({ error: 'Database not available' }, 500);
     }
     
-    const sales = await getAll(`
+    // Get total sales count
+    const totalSalesResult = await database.getRow('SELECT COUNT(*) as count FROM sell');
+    const totalSales = totalSalesResult.count || 0;
+    
+    // Get total sales by month (current year)
+    const monthlySalesResult = await database.getAll(`
       SELECT 
-        s.*,
-        c.name as customer_name,
-        c.vat as customer_vat,
-        c.city as customer_city,
-        lo.lot_number as lot_out_number,
-        lo.creation_date as lot_out_creation_date,
-        fo.name as lot_out_food_name,
-        li.lot_number as lot_in_number,
-        li.acceptance_date as lot_in_acceptance_date,
-        fi.name as lot_in_food_name,
-        p.type as package_type,
-        p.description as package_description,
-        p.measure as package_measure
-      FROM sell s
-      LEFT JOIN customer c ON s.fk_customer = c.id
-      LEFT JOIN lot_out lo ON s.fk_lot_out = lo.id
-      LEFT JOIN food_out fo ON lo.fk_food_out = fo.id
-      LEFT JOIN lot_in li ON s.fk_lot_in = li.id
-      LEFT JOIN food_in fi ON li.fk_food_in = fi.id
-      LEFT JOIN package p ON s.fk_package = p.id
-      WHERE s.fk_customer = ?
-      ORDER BY s.invoice_date DESC, s.invoice_number DESC
-    `, [customerId]);
-    
-    res.json(sales);
-  } catch (error) {
-    console.error('Error fetching sales by customer:', error);
-    res.status(500).json({ error: 'Failed to fetch sales by customer' });
-  }
-});
-
-// Get sales by date range
-router.get('/date-range/:startDate/:endDate', async (req, res) => {
-  try {
-    const { startDate, endDate } = req.params;
-    
-    const sales = await getAll(`
-      SELECT 
-        s.*,
-        c.name as customer_name,
-        c.vat as customer_vat,
-        c.city as customer_city,
-        lo.lot_number as lot_out_number,
-        lo.creation_date as lot_out_creation_date,
-        fo.name as lot_out_food_name,
-        li.lot_number as lot_in_number,
-        li.acceptance_date as lot_in_acceptance_date,
-        fi.name as lot_in_food_name,
-        p.type as package_type,
-        p.description as package_description,
-        p.measure as package_measure
-      FROM sell s
-      LEFT JOIN customer c ON s.fk_customer = c.id
-      LEFT JOIN lot_out lo ON s.fk_lot_out = lo.id
-      LEFT JOIN food_out fo ON lo.fk_food_out = fo.id
-      LEFT JOIN lot_in li ON s.fk_lot_in = li.id
-      LEFT JOIN food_in fi ON li.fk_food_in = fi.id
-      LEFT JOIN package p ON s.fk_package = p.id
-      WHERE s.invoice_date BETWEEN ? AND ?
-      ORDER BY s.invoice_date DESC, s.invoice_number DESC
-    `, [startDate, endDate]);
-    
-    res.json(sales);
-  } catch (error) {
-    console.error('Error fetching sales by date range:', error);
-    res.status(500).json({ error: 'Failed to fetch sales by date range' });
-  }
-});
-
-// Get next invoice number
-router.get('/next-invoice-number', async (req, res) => {
-  try {
-    const lastSale = await getRow(`
-      SELECT invoice_number FROM sell 
-      ORDER BY CAST(invoice_number AS INTEGER) DESC 
-      LIMIT 1
-    `);
-    
-    let nextNumber = 1;
-    if (lastSale && lastSale.invoice_number) {
-      nextNumber = parseInt(lastSale.invoice_number) + 1;
-    }
-    
-    res.json({ 
-      nextInvoiceNumber: nextNumber.toString().padStart(6, '0')
-    });
-  } catch (error) {
-    console.error('Error generating next invoice number:', error);
-    res.status(500).json({ error: 'Failed to generate next invoice number' });
-  }
-});
-
-// Get sales statistics
-router.get('/stats/summary', async (req, res) => {
-  try {
-    const totalSales = await getRow('SELECT COUNT(*) as count FROM sell');
-    const salesToday = await getRow(`
-      SELECT COUNT(*) as count FROM sell 
-      WHERE invoice_date = date('now')
-    `);
-    const salesThisMonth = await getRow(`
-      SELECT COUNT(*) as count FROM sell 
-      WHERE strftime('%Y-%m', invoice_date) = strftime('%Y-%m', 'now')
-    `);
-    const uniqueCustomers = await getRow(`
-      SELECT COUNT(DISTINCT fk_customer) as count FROM sell
-    `);
-    
-    res.json({
-      totalSales: totalSales.count,
-      salesToday: salesToday.count,
-      salesThisMonth: salesThisMonth.count,
-      uniqueCustomers: uniqueCustomers.count
-    });
-  } catch (error) {
-    console.error('Error fetching sales statistics:', error);
-    res.status(500).json({ error: 'Failed to fetch sales statistics' });
-  }
-});
-
-// Get sales by product type
-router.get('/stats/by-product-type', async (req, res) => {
-  try {
-    const stats = await getAll(`
-      SELECT 
-        CASE 
-          WHEN fk_lot_out IS NOT NULL THEN 'Processed Food'
-          WHEN fk_lot_in IS NOT NULL THEN 'Raw Material'
-          WHEN fk_package IS NOT NULL THEN 'Package'
-          ELSE 'Unknown'
-        END as product_type,
+        strftime('%m', invoice_date) as month,
         COUNT(*) as count
-      FROM sell
-      GROUP BY product_type
-      ORDER BY count DESC
+      FROM sell 
+      WHERE strftime('%Y', invoice_date) = strftime('%Y', 'now')
+      GROUP BY month
+      ORDER BY month
     `);
+    const monthlySales = monthlySalesResult || [];
     
-    res.json(stats);
+    // Get sales by customer count
+    const customersCountResult = await database.getRow('SELECT COUNT(DISTINCT fk_customer) as count FROM sell');
+    const customersCount = customersCountResult.count || 0;
+    
+    // Get recent sales (last 5)
+    const recentSalesResult = await database.getAll(`
+      SELECT 
+        s.*,
+        c.name as customer_name
+      FROM sell s
+      LEFT JOIN customer c ON s.fk_customer = c.id
+      ORDER BY s.created_at DESC
+      LIMIT 5
+    `);
+    const recentSales = recentSalesResult || [];
+    
+    return c.json({
+      totalSales,
+      monthlySales,
+      customersCount,
+      recentSales
+    });
   } catch (error) {
-    console.error('Error fetching sales by product type:', error);
-    res.status(500).json({ error: 'Failed to fetch sales by product type' });
+    console.error('Error fetching sales stats:', error);
+    return c.json({ error: 'Failed to fetch sales statistics' }, 500);
   }
 });
 
-module.exports = router; 
+export default router; 

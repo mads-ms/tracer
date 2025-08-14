@@ -14,14 +14,13 @@ const LotsIn = () => {
   const [suppliers, setSuppliers] = useState([]);
   const [foods, setFoods] = useState([]);
   const [formData, setFormData] = useState({
-    acceptance_date: '',
     lot_number: '',
-    ddt_number: '',
-    ddt_date: '',
-    expiry_date: '',
     quantity: '',
-    fk_supplier: '',
-    fk_food_in: ''
+    unit: '',
+    supplier_id: '',
+    food_id: '',
+    production_date: '',
+    expiry_date: ''
   });
 
   useEffect(() => {
@@ -83,14 +82,13 @@ const LotsIn = () => {
   const handleEdit = (lot) => {
     setEditingLot(lot);
     setFormData({
-      acceptance_date: lot.acceptance_date || '',
       lot_number: lot.lot_number || '',
-      ddt_number: lot.ddt_number || '',
-      ddt_date: lot.ddt_date || '',
-      expiry_date: lot.expiry_date || '',
       quantity: lot.quantity || '',
-      fk_supplier: lot.fk_supplier || '',
-      fk_food_in: lot.fk_food_in || ''
+      unit: lot.unit || '',
+      supplier_id: lot.supplier_id || '',
+      food_id: lot.food_id || '',
+      production_date: lot.production_date || '',
+      expiry_date: lot.expiry_date || ''
     });
     setShowForm(true);
   };
@@ -109,190 +107,154 @@ const LotsIn = () => {
 
   const resetForm = () => {
     setFormData({
-      acceptance_date: '',
       lot_number: '',
-      ddt_number: '',
-      ddt_date: '',
-      expiry_date: '',
       quantity: '',
-      fk_supplier: '',
-      fk_food_in: ''
+      unit: '',
+      supplier_id: '',
+      food_id: '',
+      production_date: '',
+      expiry_date: ''
     });
   };
 
   const filteredLots = lots.filter(lot =>
-    (lot.lot_number && lot.lot_number.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (lot.supplier_name && lot.supplier_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (lot.food_name && lot.food_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (lot.acceptance_date && lot.acceptance_date.includes(searchTerm))
+    lot.lot_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    lot.food_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    lot.supplier_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (loading) {
-    return (
-      <div className="lots-in-page">
-        <div className="page-header">
-          <h1 className="page-title">Incoming Lots</h1>
-          <p className="page-subtitle">Register and manage incoming lots of raw materials</p>
-        </div>
-        <div className="loading">
-          <div className="spinner"></div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="lots-in-page">
+    <div className="lots-in-container">
       <div className="page-header">
-        <div className="header-content">
-          <div>
-            <h1 className="page-title">Incoming Lots</h1>
-            <p className="page-subtitle">Register and manage incoming lots of raw materials</p>
-          </div>
-          <button 
-            className="btn btn-primary"
-            onClick={() => {
-              setShowForm(true);
-              setEditingLot(null);
-              resetForm();
-            }}
-          >
-            <FaPlus /> Add Incoming Lot
-          </button>
-        </div>
+        <h1>Incoming Lots Management</h1>
+        <button onClick={() => setShowForm(true)} className="btn btn-primary">
+          <FaPlus /> Add New Lot
+        </button>
       </div>
 
       <div className="search-bar">
-        <div className="search-input-wrapper">
-          <FaSearch className="search-icon" />
-          <input
-            type="text"
-            placeholder="Search lots..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="search-input"
-          />
-        </div>
+        <FaSearch />
+        <input
+          type="text"
+          placeholder="Search lots by number, food, or supplier..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </div>
 
       {showForm && (
-        <div className="card">
-          <h3>{editingLot ? 'Edit Incoming Lot' : 'Add New Incoming Lot'}</h3>
-          <form onSubmit={handleSubmit} className="lotsin-form">
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Acceptance Date *</label>
-                <input
-                  type="date"
-                  value={formData.acceptance_date}
-                  onChange={(e) => setFormData({...formData, acceptance_date: e.target.value})}
-                  className="form-input"
-                  required
-                />
+        <div className="modal-overlay">
+          <div className="modal">
+            <h2>{editingLot ? 'Edit Incoming Lot' : 'Add New Incoming Lot'}</h2>
+            <form onSubmit={handleSubmit}>
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Lot Number *</label>
+                  <input
+                    type="text"
+                    value={formData.lot_number}
+                    onChange={(e) => setFormData({...formData, lot_number: e.target.value})}
+                    className="form-input"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Quantity *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.quantity}
+                    onChange={(e) => setFormData({...formData, quantity: e.target.value})}
+                    className="form-input"
+                    required
+                  />
+                </div>
               </div>
-              <div className="form-group">
-                <label className="form-label">Lot Number *</label>
-                <input
-                  type="text"
-                  value={formData.lot_number}
-                  onChange={(e) => setFormData({...formData, lot_number: e.target.value})}
-                  className="form-input"
-                  required
-                />
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Unit *</label>
+                  <input
+                    type="text"
+                    value={formData.unit}
+                    onChange={(e) => setFormData({...formData, unit: e.target.value})}
+                    className="form-input"
+                    placeholder="e.g., kg, liters, pieces"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Supplier *</label>
+                  <select
+                    value={formData.supplier_id}
+                    onChange={(e) => setFormData({...formData, supplier_id: e.target.value})}
+                    className="form-input"
+                    required
+                  >
+                    <option value="">Select Supplier</option>
+                    {suppliers.map(supplier => (
+                      <option key={supplier.id} value={supplier.id}>
+                        {supplier.name} ({supplier.vat})
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-            </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">DDT Number *</label>
-                <input
-                  type="text"
-                  value={formData.ddt_number}
-                  onChange={(e) => setFormData({...formData, ddt_number: e.target.value})}
-                  className="form-input"
-                  required
-                />
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Food Item *</label>
+                  <select
+                    value={formData.food_id}
+                    onChange={(e) => setFormData({...formData, food_id: e.target.value})}
+                    className="form-input"
+                    required
+                  >
+                    <option value="">Select Food Item</option>
+                    {foods.map(food => (
+                      <option key={food.id} value={food.id}>
+                        {food.name} {food.category ? `(${food.category})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Production Date</label>
+                  <input
+                    type="date"
+                    value={formData.production_date}
+                    onChange={(e) => setFormData({...formData, production_date: e.target.value})}
+                    className="form-input"
+                  />
+                </div>
               </div>
-              <div className="form-group">
-                <label className="form-label">DDT Date *</label>
-                <input
-                  type="date"
-                  value={formData.ddt_date}
-                  onChange={(e) => setFormData({...formData, ddt_date: e.target.value})}
-                  className="form-input"
-                  required
-                />
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Expiry Date</label>
+                  <input
+                    type="date"
+                    value={formData.expiry_date}
+                    onChange={(e) => setFormData({...formData, expiry_date: e.target.value})}
+                    className="form-input"
+                  />
+                </div>
               </div>
-            </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Expiry Date</label>
-                <input
-                  type="date"
-                  value={formData.expiry_date}
-                  onChange={(e) => setFormData({...formData, expiry_date: e.target.value})}
-                  className="form-input"
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Quantity *</label>
-                <input
-                  type="number"
-                  value={formData.quantity}
-                  onChange={(e) => setFormData({...formData, quantity: e.target.value})}
-                  className="form-input"
-                  required
-                  min="0"
-                  step="any"
-                />
-              </div>
-            </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Supplier *</label>
-                <select
-                  value={formData.fk_supplier}
-                  onChange={(e) => setFormData({...formData, fk_supplier: e.target.value})}
-                  className="form-input"
-                  required
+              <div className="form-actions">
+                <button type="submit" className="btn btn-primary">
+                  {editingLot ? 'Update Lot' : 'Create Lot'}
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-outline"
+                  onClick={() => {
+                    setShowForm(false);
+                    setEditingLot(null);
+                    resetForm();
+                  }}
                 >
-                  <option value="">Select supplier</option>
-                  {suppliers.map(s => (
-                    <option key={s.id} value={s.id}>{s.name} ({s.vat})</option>
-                  ))}
-                </select>
+                  Cancel
+                </button>
               </div>
-              <div className="form-group">
-                <label className="form-label">Food Item *</label>
-                <select
-                  value={formData.fk_food_in}
-                  onChange={(e) => setFormData({...formData, fk_food_in: e.target.value})}
-                  className="form-input"
-                  required
-                >
-                  <option value="">Select food item</option>
-                  {foods.map(f => (
-                    <option key={f.id} value={f.id}>{f.name} ({f.unit_measure})</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="form-actions">
-              <button type="submit" className="btn btn-primary">
-                {editingLot ? 'Update Incoming Lot' : 'Add Incoming Lot'}
-              </button>
-              <button 
-                type="button" 
-                className="btn btn-outline"
-                onClick={() => {
-                  setShowForm(false);
-                  setEditingLot(null);
-                  resetForm();
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
+            </form>
+          </div>
         </div>
       )}
 
@@ -300,6 +262,7 @@ const LotsIn = () => {
         <div className="table-header">
           <h3>Incoming Lots ({filteredLots.length})</h3>
         </div>
+        
         {filteredLots.length === 0 ? (
           <div className="empty-state">
             <p>No incoming lots found. {searchTerm && 'Try adjusting your search.'}</p>
@@ -309,41 +272,39 @@ const LotsIn = () => {
             <table className="table">
               <thead>
                 <tr>
-                  <th>Acceptance Date</th>
                   <th>Lot Number</th>
-                  <th>DDT Number</th>
-                  <th>DDT Date</th>
-                  <th>Expiry Date</th>
-                  <th>Quantity</th>
-                  <th>Supplier</th>
                   <th>Food Item</th>
+                  <th>Quantity</th>
+                  <th>Unit</th>
+                  <th>Supplier</th>
+                  <th>Production Date</th>
+                  <th>Expiry Date</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredLots.map(lot => (
                   <tr key={lot.id}>
-                    <td>{lot.acceptance_date}</td>
                     <td>{lot.lot_number}</td>
-                    <td>{lot.ddt_number}</td>
-                    <td>{lot.ddt_date}</td>
-                    <td>{lot.expiry_date || '-'}</td>
+                    <td>{lot.food_name || '-'}</td>
                     <td>{lot.quantity}</td>
-                    <td>{lot.supplier_name}</td>
-                    <td>{lot.food_name}</td>
+                    <td>{lot.unit}</td>
+                    <td>{lot.supplier_name || '-'}</td>
+                    <td>{lot.production_date || '-'}</td>
+                    <td>{lot.expiry_date || '-'}</td>
                     <td>
                       <div className="action-buttons">
                         <button
                           className="btn btn-outline btn-sm"
                           onClick={() => handleEdit(lot)}
-                          title="Edit incoming lot"
+                          title="Edit lot"
                         >
                           <FaEdit />
                         </button>
                         <button
                           className="btn btn-danger btn-sm"
                           onClick={() => handleDelete(lot)}
-                          title="Delete incoming lot"
+                          title="Delete lot"
                         >
                           <FaTrash />
                         </button>

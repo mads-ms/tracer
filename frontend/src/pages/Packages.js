@@ -47,7 +47,7 @@ import { API_ENDPOINTS, buildApiUrl } from '../config/api';
 
 const Packages = () => {
   const [packages, setPackages] = useState([]);
-  const [gtinCodes, setGtinCodes] = useState([]);
+  const [barcodes, setBarcodes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -67,12 +67,12 @@ const Packages = () => {
     measure: '',
     more_information: false,
     variable: false,
-    fk_gtin: ''
+    fk_barcode: ''
   });
 
   useEffect(() => {
     fetchPackages();
-    fetchGtinCodes();
+    fetchBarcodes();
     fetchStats();
   }, []);
 
@@ -90,14 +90,14 @@ const Packages = () => {
     }
   };
 
-  const fetchGtinCodes = async () => {
+  const fetchBarcodes = async () => {
     try {
       const response = await fetch(API_ENDPOINTS.BARCODES);
-      if (!response.ok) throw new Error('Failed to fetch GTIN codes');
+      if (!response.ok) throw new Error('Failed to fetch barcodes');
       const data = await response.json();
-      setGtinCodes(data);
+      setBarcodes(data);
     } catch (err) {
-      console.error('Error fetching GTIN codes:', err);
+      console.error('Error fetching barcodes:', err);
     }
   };
 
@@ -204,7 +204,7 @@ const Packages = () => {
       measure: pkg.measure,
       more_information: pkg.more_information === 1,
       variable: pkg.variable === 1,
-      fk_gtin: pkg.fk_gtin || ''
+      fk_barcode: pkg.fk_barcode || ''
     });
     setDialogOpen(true);
   };
@@ -222,7 +222,7 @@ const Packages = () => {
       measure: '',
       more_information: false,
       variable: false,
-      fk_gtin: ''
+      fk_barcode: ''
     });
     setEditingPackage(null);
   };
@@ -484,19 +484,19 @@ const Packages = () => {
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
-                <FormControl fullWidth margin="normal">
-                  <InputLabel>GTIN Code (Optional)</InputLabel>
+                <FormControl fullWidth>
+                  <InputLabel>Barcode (Optional)</InputLabel>
                   <Select
-                    value={formData.fk_gtin}
-                    onChange={(e) => setFormData({ ...formData, fk_gtin: e.target.value })}
-                    label="GTIN Code (Optional)"
+                    value={formData.fk_barcode}
+                    onChange={(e) => setFormData({ ...formData, fk_barcode: e.target.value })}
+                    label="Barcode (Optional)"
                   >
                     <MenuItem value="">
-                      <em>No GTIN</em>
+                      <em>No Barcode</em>
                     </MenuItem>
-                    {gtinCodes.map((gtin) => (
-                      <MenuItem key={gtin.id} value={gtin.id}>
-                        {gtin.code} (Progressive: {gtin.progressive})
+                    {barcodes.map((barcode) => (
+                      <MenuItem key={barcode.id} value={barcode.id}>
+                        {barcode.code} ({barcode.type})
                       </MenuItem>
                     ))}
                   </Select>

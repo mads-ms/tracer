@@ -1,649 +1,302 @@
-const express = require('express');
-const router = express.Router();
-const { runQuery, getRow, getAll } = require('../database/database');
+import { Hono } from 'hono';
 
-// Get all GTIN codes
-router.get('/', async (req, res) => {
+const router = new Hono();
+
+// Get all barcodes
+router.get('/', async (c) => {
   try {
-    const gtinCodes = await getAll(`
+    const database = c.get('database');
+    if (!database) {
+      return c.json({ error: 'Database not available' }, 500);
+    }
+    
+    const barcodes = await database.getAll(`
       SELECT 
-        g.*,
-        COUNT(DISTINCT fo.id) as food_count,
-        COUNT(DISTINCT p.id) as package_count
-      FROM gtin_13 g
-      LEFT JOIN food_out fo ON g.id = fo.fk_gtin
-      LEFT JOIN package p ON g.id = p.fk_gtin
-      GROUP BY g.id, g.code, g.progressive
-      ORDER BY g.code ASC
-    `);
-    res.json(gtinCodes);
-  } catch (error) {
-    console.error('Error fetching GTIN codes:', error);
-    res.status(500).json({ error: 'Failed to fetch GTIN codes' });
-  }
-});
-
-// Get GTIN by ID
-router.get('/:id', async (req, res) => {
-  try {
-    const gtin = await getRow(`
-      SELECT 
-        g.*,
-        COUNT(DISTINCT fo.id) as food_count,
-        COUNT(DISTINCT p.id) as package_count
-      FROM gtin_13 g
-      LEFT JOIN food_out fo ON g.id = fo.fk_gtin
-      LEFT JOIN package p ON g.id = p.fk_gtin
-      WHERE g.id = ?
-      GROUP BY g.id, g.code, g.progressive
-    `, [req.params.id]);
-    
-    if (!gtin) {
-      return res.status(404).json({ error: 'GTIN not found' });
-    }
-    
-    res.json(gtin);
-  } catch (error) {
-    console.error('Error fetching GTIN:', error);
-    res.status(500).json({ error: 'Failed to fetch GTIN' });
-  }
-});
-
-// Create new GTIN
-router.post('/', async (req, res) => {
-  try {
-    const { code, progressive } = req.body;
-    
-    // Validation
-    if (!code) {
-      return res.status(400).json({ error: 'GTIN code is required' });
-    }
-    
-    // Validate GTIN format (13 digits)
-    if (!/^\d{13}$/.test(code)) {
-      return res.status(400).json({ error: 'GTIN must be exactly 13 digits' });
-    }
-    
-    // Check if GTIN already exists
-    const existingGtin = await getRow(
-      'SELECT id FROM gtin_13 WHERE code = ?',
-      [code]
-    );
-    
-    if (existingGtin) {
-      return res.status(400).json({ error: 'GTIN code already exists' });
-    }
-    
-    const result = await runQuery(
-      'INSERT INTO gtin_13 (code, progressive) VALUES (?, ?)',
-      [code, progressive || 0]
-    );
-    
-    const newGtin = await getRow(`
-      SELECT 
-        g.*,
-        COUNT(DISTINCT fo.id) as food_count,
-        COUNT(DISTINCT p.id) as package_count
-      FROM gtin_13 g
-      LEFT JOIN food_out fo ON g.id = fo.fk_gtin
-      LEFT JOIN package p ON g.id = p.fk_gtin
-      WHERE g.id = ?
-      GROUP BY g.id, g.code, g.progressive
-    `, [result.lastID]);
-    
-    res.status(201).json(newGtin);
-  } catch (error) {
-    console.error('Error creating GTIN:', error);
-    res.status(500).json({ error: 'Failed to create GTIN' });
-  }
-});
-
-// Update GTIN
-router.put('/:id', async (req, res) => {
-  try {
-    const { code, progressive } = req.body;
-    const gtinId = req.params.id;
-    
-    // Validation
-    if (!code) {
-      return res.status(400).json({ error: 'GTIN code is required' });
-    }
-    
-    // Validate GTIN format (13 digits)
-    if (!/^\d{13}$/.test(code)) {
-      return res.status(400).json({ error: 'GTIN must be exactly 13 digits' });
-    }
-    
-    // Check if GTIN exists
-    const existingGtin = await getRow(
-      'SELECT id FROM gtin_13 WHERE id = ?',
-      [gtinId]
-    );
-    
-    if (!existingGtin) {
-      return res.status(404).json({ error: 'GTIN not found' });
-    }
-    
-    // Check if new code already exists for another GTIN
-    const duplicateCode = await getRow(
-      'SELECT id FROM gtin_13 WHERE code = ? AND id != ?',
-      [code, gtinId]
-    );
-    
-    if (duplicateCode) {
-      return res.status(400).json({ error: 'GTIN code already exists' });
-    }
-    
-    await runQuery(
-      'UPDATE gtin_13 SET code = ?, progressive = ? WHERE id = ?',
-      [code, progressive || 0, gtinId]
-    );
-    
-    const updatedGtin = await getRow(`
-      SELECT 
-        g.*,
-        COUNT(DISTINCT fo.id) as food_count,
-        COUNT(DISTINCT p.id) as package_count
-      FROM gtin_13 g
-      LEFT JOIN food_out fo ON g.id = fo.fk_gtin
-      LEFT JOIN package p ON g.id = p.fk_gtin
-      WHERE g.id = ?
-      GROUP BY g.id, g.code, g.progressive
-    `, [gtinId]);
-    
-    res.json(updatedGtin);
-  } catch (error) {
-    console.error('Error updating GTIN:', error);
-    res.status(500).json({ error: 'Failed to update GTIN' });
-  }
-});
-
-// Delete GTIN
-router.delete('/:id', async (req, res) => {
-  try {
-    const gtinId = req.params.id;
-    
-    // Check if GTIN exists
-    const existingGtin = await getRow(
-      'SELECT id FROM gtin_13 WHERE id = ?',
-      [gtinId]
-    );
-    
-    if (!existingGtin) {
-      return res.status(404).json({ error: 'GTIN not found' });
-    }
-    
-    // Check if GTIN is referenced in foods
-    const foodCount = await getRow(
-      'SELECT COUNT(*) as count FROM food_out WHERE fk_gtin = ?',
-      [gtinId]
-    );
-    
-    // Check if GTIN is referenced in packages
-    const packageCount = await getRow(
-      'SELECT COUNT(*) as count FROM package WHERE fk_gtin = ?',
-      [gtinId]
-    );
-    
-    if (foodCount.count > 0 || packageCount.count > 0) {
-      return res.status(400).json({ 
-        error: 'Cannot delete GTIN: it is referenced in foods or packages' 
-      });
-    }
-    
-    await runQuery('DELETE FROM gtin_13 WHERE id = ?', [gtinId]);
-    
-    res.json({ message: 'GTIN deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting GTIN:', error);
-    res.status(500).json({ error: 'Failed to delete GTIN' });
-  }
-});
-
-// Search GTIN codes
-router.get('/search/:query', async (req, res) => {
-  try {
-    const query = `%${req.params.query}%`;
-    const gtinCodes = await getAll(`
-      SELECT 
-        g.*,
-        COUNT(DISTINCT fo.id) as food_count,
-        COUNT(DISTINCT p.id) as package_count
-      FROM gtin_13 g
-      LEFT JOIN food_out fo ON g.id = fo.fk_gtin
-      LEFT JOIN package p ON g.id = p.fk_gtin
-      WHERE g.code LIKE ?
-      GROUP BY g.id, g.code, g.progressive
-      ORDER BY g.code ASC
-    `, [query]);
-    
-    res.json(gtinCodes);
-  } catch (error) {
-    console.error('Error searching GTIN codes:', error);
-    res.status(500).json({ error: 'Failed to search GTIN codes' });
-  }
-});
-
-// Get GTIN by code
-router.get('/code/:code', async (req, res) => {
-  try {
-    const code = req.params.code;
-    
-    const gtin = await getRow(`
-      SELECT 
-        g.*,
-        COUNT(DISTINCT fo.id) as food_count,
-        COUNT(DISTINCT p.id) as package_count
-      FROM gtin_13 g
-      LEFT JOIN food_out fo ON g.id = fo.fk_gtin
-      LEFT JOIN package p ON g.id = p.fk_gtin
-      WHERE g.code = ?
-      GROUP BY g.id, g.code, g.progressive
-    `, [code]);
-    
-    if (!gtin) {
-      return res.status(404).json({ error: 'GTIN not found' });
-    }
-    
-    res.json(gtin);
-  } catch (error) {
-    console.error('Error fetching GTIN by code:', error);
-    res.status(500).json({ error: 'Failed to fetch GTIN by code' });
-  }
-});
-
-// Get foods associated with GTIN
-router.get('/:id/foods', async (req, res) => {
-  try {
-    const gtinId = req.params.id;
-    
-    // Check if GTIN exists
-    const gtin = await getRow(
-      'SELECT id FROM gtin_13 WHERE id = ?',
-      [gtinId]
-    );
-    
-    if (!gtin) {
-      return res.status(404).json({ error: 'GTIN not found' });
-    }
-    
-    const foods = await getAll(`
-      SELECT 
-        fo.*,
-        g.code as gtin_code,
-        g.progressive
-      FROM food_out fo
-      LEFT JOIN gtin_13 g ON fo.fk_gtin = g.id
-      WHERE fo.fk_gtin = ?
-      ORDER BY fo.name ASC
-    `, [gtinId]);
-    
-    res.json(foods);
-  } catch (error) {
-    console.error('Error fetching GTIN foods:', error);
-    res.status(500).json({ error: 'Failed to fetch GTIN foods' });
-  }
-});
-
-// Get packages associated with GTIN
-router.get('/:id/packages', async (req, res) => {
-  try {
-    const gtinId = req.params.id;
-    
-    // Check if GTIN exists
-    const gtin = await getRow(
-      'SELECT id FROM gtin_13 WHERE id = ?',
-      [gtinId]
-    );
-    
-    if (!gtin) {
-      return res.status(404).json({ error: 'GTIN not found' });
-    }
-    
-    const packages = await getAll(`
-      SELECT 
-        p.*,
-        g.code as gtin_code,
-        g.progressive
-      FROM package p
-      LEFT JOIN gtin_13 g ON p.fk_gtin = g.id
-      WHERE p.fk_gtin = ?
-      ORDER BY p.type ASC, p.description ASC
-    `, [gtinId]);
-    
-    res.json(packages);
-  } catch (error) {
-    console.error('Error fetching GTIN packages:', error);
-    res.status(500).json({ error: 'Failed to fetch GTIN packages' });
-  }
-});
-
-// Get lots associated with GTIN
-router.get('/:id/lots', async (req, res) => {
-  try {
-    const gtinId = req.params.id;
-    
-    // Check if GTIN exists
-    const gtin = await getRow(
-      'SELECT id FROM gtin_13 WHERE id = ?',
-      [gtinId]
-    );
-    
-    if (!gtin) {
-      return res.status(404).json({ error: 'GTIN not found' });
-    }
-    
-    const lots = await getAll(`
-      SELECT 
-        lo.*,
-        fo.name as food_name,
-        fo.unit_measure,
-        g.code as gtin_code,
-        li.lot_number as source_lot_number,
-        li.acceptance_date as source_acceptance_date,
-        fi.name as source_food_name
-      FROM lot_out lo
-      LEFT JOIN food_out fo ON lo.fk_food_out = fo.id
-      LEFT JOIN gtin_13 g ON fo.fk_gtin = g.id
-      LEFT JOIN lot_in li ON lo.fk_lot_in = li.id
-      LEFT JOIN food_in fi ON li.fk_food_in = fi.id
-      WHERE fo.fk_gtin = ?
-      ORDER BY lo.creation_date DESC
-    `, [gtinId]);
-    
-    res.json(lots);
-  } catch (error) {
-    console.error('Error fetching GTIN lots:', error);
-    res.status(500).json({ error: 'Failed to fetch GTIN lots' });
-  }
-});
-
-// Get sales associated with GTIN
-router.get('/:id/sales', async (req, res) => {
-  try {
-    const gtinId = req.params.id;
-    
-    // Check if GTIN exists
-    const gtin = await getRow(
-      'SELECT id FROM gtin_13 WHERE id = ?',
-      [gtinId]
-    );
-    
-    if (!gtin) {
-      return res.status(404).json({ error: 'GTIN not found' });
-    }
-    
-    const sales = await getAll(`
-      SELECT 
-        s.*,
-        c.name as customer_name,
-        c.vat as customer_vat,
-        c.city as customer_city,
+        b.*,
+        li.lot_number as lot_in_number,
         lo.lot_number as lot_out_number,
-        fo.name as lot_out_food_name,
-        g.code as gtin_code
-      FROM sell s
-      LEFT JOIN customer c ON s.fk_customer = c.id
-      LEFT JOIN lot_out lo ON s.fk_lot_out = lo.id
-      LEFT JOIN food_out fo ON lo.fk_food_out = fo.id
-      LEFT JOIN gtin_13 g ON fo.fk_gtin = g.id
-      WHERE fo.fk_gtin = ?
-      ORDER BY s.invoice_date DESC
-    `, [gtinId]);
-    
-    res.json(sales);
-  } catch (error) {
-    console.error('Error fetching GTIN sales:', error);
-    res.status(500).json({ error: 'Failed to fetch GTIN sales' });
-  }
-});
-
-// Generate next GTIN code
-router.get('/generate/next', async (req, res) => {
-  try {
-    const { prefix, startNumber = 1 } = req.query;
-    
-    if (!prefix) {
-      return res.status(400).json({ error: 'Prefix is required' });
-    }
-    
-    // Validate prefix format (should be 12 digits for GTIN-13)
-    if (!/^\d{12}$/.test(prefix)) {
-      return res.status(400).json({ error: 'Prefix must be exactly 12 digits' });
-    }
-    
-    // Find the highest existing progressive number for this prefix
-    const existingGtin = await getRow(`
-      SELECT MAX(progressive) as max_progressive 
-      FROM gtin_13 
-      WHERE code LIKE ?
-    `, [`${prefix}%`]);
-    
-    let nextNumber = startNumber;
-    if (existingGtin && existingGtin.max_progressive) {
-      nextNumber = Math.max(startNumber, existingGtin.max_progressive + 1);
-    }
-    
-    // Generate the 13-digit GTIN code
-    const gtinCode = prefix + (nextNumber % 10);
-    
-    // Calculate check digit (GTIN-13 algorithm)
-    const checkDigit = calculateGTIN13CheckDigit(gtinCode);
-    const fullGTIN = gtinCode + checkDigit;
-    
-    res.json({
-      nextProgressive: nextNumber,
-      gtinCode: fullGTIN,
-      prefix,
-      checkDigit
-    });
-  } catch (error) {
-    console.error('Error generating next GTIN:', error);
-    res.status(500).json({ error: 'Failed to generate next GTIN' });
-  }
-});
-
-// Validate GTIN check digit
-router.post('/validate', async (req, res) => {
-  try {
-    const { code } = req.body;
-    
-    if (!code) {
-      return res.status(400).json({ error: 'GTIN code is required' });
-    }
-    
-    if (!/^\d{13}$/.test(code)) {
-      return res.status(400).json({ 
-        error: 'GTIN must be exactly 13 digits',
-        valid: false 
-      });
-    }
-    
-    const providedCheckDigit = parseInt(code.charAt(12));
-    const calculatedCheckDigit = calculateGTIN13CheckDigit(code.substring(0, 12));
-    
-    const isValid = providedCheckDigit === calculatedCheckDigit;
-    
-    res.json({
-      code,
-      providedCheckDigit,
-      calculatedCheckDigit,
-      valid: isValid
-    });
-  } catch (error) {
-    console.error('Error validating GTIN:', error);
-    res.status(500).json({ error: 'Failed to validate GTIN' });
-  }
-});
-
-// Get GTIN statistics
-router.get('/stats/summary', async (req, res) => {
-  try {
-    const totalGTINs = await getRow('SELECT COUNT(*) as count FROM gtin_13');
-    const gtinWithFoods = await getRow(`
-      SELECT COUNT(DISTINCT fk_gtin) as count FROM food_out WHERE fk_gtin IS NOT NULL
+        p.description as package_description
+      FROM barcode b
+      LEFT JOIN lot_in li ON b.fk_lot_in = li.id
+      LEFT JOIN lot_out lo ON b.fk_lot_out = lo.id
+      LEFT JOIN package p ON b.fk_package = p.id
+      ORDER BY b.created_at DESC
     `);
-    const gtinWithPackages = await getRow(`
-      SELECT COUNT(DISTINCT fk_gtin) as count FROM package WHERE fk_gtin IS NOT NULL
-    `);
-    const unusedGTINs = await getRow(`
-      SELECT COUNT(*) as count FROM gtin_13 g
-      LEFT JOIN food_out fo ON g.id = fo.fk_gtin
-      LEFT JOIN package p ON g.id = p.fk_gtin
-      WHERE fo.id IS NULL AND p.id IS NULL
-    `);
-    
-    res.json({
-      totalGTINs: totalGTINs.count,
-      gtinWithFoods: gtinWithFoods.count,
-      gtinWithPackages: gtinWithPackages.count,
-      unusedGTINs: unusedGTINs.count
-    });
+    return c.json(barcodes);
   } catch (error) {
-    console.error('Error fetching GTIN statistics:', error);
-    res.status(500).json({ error: 'Failed to fetch GTIN statistics' });
+    console.error('Error fetching barcodes:', error);
+    return c.json({ error: 'Failed to fetch barcodes' }, 500);
   }
 });
 
-// Bulk import GTIN codes
-router.post('/bulk-import', async (req, res) => {
+// Get barcode by ID
+router.get('/:id', async (c) => {
   try {
-    const { gtinCodes } = req.body;
-    
-    if (!Array.isArray(gtinCodes) || gtinCodes.length === 0) {
-      return res.status(400).json({ error: 'GTIN codes array is required' });
+    const database = c.get('database');
+    if (!database) {
+      return c.json({ error: 'Database not available' }, 500);
     }
     
-    const results = {
-      imported: 0,
-      skipped: 0,
-      errors: []
-    };
+    const barcode = await database.getRow(`
+      SELECT 
+        b.*,
+        li.lot_number as lot_in_number,
+        lo.lot_number as lot_out_number,
+        p.description as package_description
+      FROM barcode b
+      LEFT JOIN lot_in li ON b.fk_lot_in = li.id
+      LEFT JOIN lot_out lo ON b.fk_lot_out = lo.id
+      LEFT JOIN package p ON b.fk_package = p.id
+      WHERE b.id = ?
+    `, [c.req.param('id')]);
     
-    for (const gtinData of gtinCodes) {
-      try {
-        const { code, progressive = 0 } = gtinData;
-        
-        if (!code) {
-          results.errors.push({ code: 'N/A', error: 'Code is required' });
-          continue;
-        }
-        
-        // Validate GTIN format
-        if (!/^\d{13}$/.test(code)) {
-          results.errors.push({ code, error: 'GTIN must be exactly 13 digits' });
-          continue;
-        }
-        
-        // Check if GTIN already exists
-        const existingGtin = await getRow(
-          'SELECT id FROM gtin_13 WHERE code = ?',
-          [code]
-        );
-        
-        if (existingGtin) {
-          results.skipped++;
-          continue;
-        }
-        
-        // Insert new GTIN
-        await runQuery(
-          'INSERT INTO gtin_13 (code, progressive) VALUES (?, ?)',
-          [code, progressive]
-        );
-        
-        results.imported++;
-      } catch (error) {
-        results.errors.push({ 
-          code: gtinData.code || 'N/A', 
-          error: error.message 
-        });
+    if (!barcode) {
+      return c.json({ error: 'Barcode not found' }, 404);
+    }
+    return c.json(barcode);
+  } catch (error) {
+    console.error('Error fetching barcode:', error);
+    return c.json({ error: 'Failed to fetch barcode' }, 500);
+  }
+});
+
+// Create new barcode
+router.post('/', async (c) => {
+  try {
+    const database = c.get('database');
+    if (!database) {
+      return c.json({ error: 'Database not available' }, 500);
+    }
+    
+    const body = await c.req.json();
+    const { code, type, description, fk_lot_in, fk_lot_out, fk_package } = body;
+    
+    // Validate required fields
+    if (!code || !type) {
+      return c.json({ error: 'Code and type are required' }, 400);
+    }
+
+    // Check if code already exists
+    const existingCode = await database.getRow('SELECT id FROM barcode WHERE code = ?', [code]);
+    if (existingCode) {
+      return c.json({ error: 'Barcode code already exists' }, 400);
+    }
+
+    // Validate that at least one reference is provided
+    if (!fk_lot_in && !fk_lot_out && !fk_package) {
+      return c.json({ error: 'At least one reference (lot_in, lot_out, or package) must be provided' }, 400);
+    }
+
+    // Check if lot_in exists (if provided)
+    if (fk_lot_in) {
+      const lotIn = await database.getRow('SELECT id FROM lot_in WHERE id = ?', [fk_lot_in]);
+      if (!lotIn) {
+        return c.json({ error: 'Incoming lot not found' }, 400);
       }
     }
-    
-    res.json(results);
-  } catch (error) {
-    console.error('Error bulk importing GTIN codes:', error);
-    res.status(500).json({ error: 'Failed to bulk import GTIN codes' });
-  }
-});
 
-// Export GTIN codes
-router.get('/export/:format', async (req, res) => {
-  try {
-    const format = req.params.format;
-    
-    if (!['json', 'csv'].includes(format)) {
-      return res.status(400).json({ error: 'Export format must be "json" or "csv"' });
+    // Check if lot_out exists (if provided)
+    if (fk_lot_out) {
+      const lotOut = await database.getRow('SELECT id FROM lot_out WHERE id = ?', [fk_lot_out]);
+      if (!lotOut) {
+        return c.json({ error: 'Outgoing lot not found' }, 400);
+      }
     }
-    
-    const gtinCodes = await getAll(`
+
+    // Check if package exists (if provided)
+    if (fk_package) {
+      const packageItem = await database.getRow('SELECT id FROM package WHERE id = ?', [fk_package]);
+      if (!packageItem) {
+        return c.json({ error: 'Package not found' }, 400);
+      }
+    }
+
+    const result = await database.runQuery(
+      'INSERT INTO barcode (code, type, description, fk_lot_in, fk_lot_out, fk_package) VALUES (?, ?, ?, ?, ?, ?)',
+      [code, type, description || null, fk_lot_in || null, fk_lot_out || null, fk_package || null]
+    );
+
+    // Check if we got a valid result
+    if (!result || !result.id) {
+      // If we can't get the ID, try to fetch the barcode by code
+      const newBarcode = await database.getRow(
+        'SELECT * FROM barcode WHERE code = ? ORDER BY created_at DESC LIMIT 1',
+        [code]
+      );
+      if (newBarcode) {
+        return c.json(newBarcode, 201);
+      } else {
+        return c.json({ 
+          message: 'Barcode created successfully but could not retrieve details',
+          success: true 
+        }, 201);
+      }
+    }
+
+    const newBarcode = await database.getRow(`
       SELECT 
-        g.*,
-        COUNT(DISTINCT fo.id) as food_count,
-        COUNT(DISTINCT p.id) as package_count
-      FROM gtin_13 g
-      LEFT JOIN food_out fo ON g.id = fo.fk_gtin
-      LEFT JOIN package p ON g.id = p.fk_gtin
-      GROUP BY g.id, g.code, g.progressive
-      ORDER BY g.code ASC
-    `);
+        b.*,
+        li.lot_number as lot_in_number,
+        lo.lot_number as lot_out_number,
+        p.description as package_description
+      FROM barcode b
+      LEFT JOIN lot_in li ON b.fk_lot_in = li.id
+      LEFT JOIN lot_out lo ON b.fk_lot_out = lo.id
+      LEFT JOIN package p ON b.fk_package = p.id
+      WHERE b.id = ?
+    `, [result.id]);
     
-    const exportData = {
-      exportDate: new Date().toISOString(),
-      gtinCodes
-    };
-    
-    if (format === 'json') {
-      res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Content-Disposition', 'attachment; filename="gtin-codes-export.json"');
-      res.json(exportData);
-    } else if (format === 'csv') {
-      const csvData = convertGTINToCSV(exportData);
-      res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', 'attachment; filename="gtin-codes-export.csv"');
-      res.send(csvData);
-    }
+    return c.json(newBarcode, 201);
   } catch (error) {
-    console.error('Error exporting GTIN codes:', error);
-    res.status(500).json({ error: 'Failed to export GTIN codes' });
+    console.error('Error creating barcode:', error);
+    return c.json({ error: 'Failed to create barcode' }, 500);
   }
 });
 
-// Helper function to calculate GTIN-13 check digit
-function calculateGTIN13CheckDigit(code12) {
-  let sum = 0;
-  for (let i = 0; i < 12; i++) {
-    const digit = parseInt(code12.charAt(i));
-    sum += digit * (i % 2 === 0 ? 1 : 3);
+// Update barcode
+router.put('/:id', async (c) => {
+  try {
+    const database = c.get('database');
+    if (!database) {
+      return c.json({ error: 'Database not available' }, 500);
+    }
+    
+    const body = await c.req.json();
+    const { code, type, description, fk_lot_in, fk_lot_out, fk_package } = body;
+    const barcodeId = c.req.param('id');
+
+    // Validate required fields
+    if (!code || !type) {
+      return c.json({ error: 'Code and type are required' }, 400);
+    }
+
+    // Check if barcode exists
+    const existingBarcode = await database.getRow('SELECT id FROM barcode WHERE id = ?', [barcodeId]);
+    if (!existingBarcode) {
+      return c.json({ error: 'Barcode not found' }, 404);
+    }
+
+    // Check if code already exists for another barcode
+    const duplicateCode = await database.getRow('SELECT id FROM barcode WHERE code = ? AND id != ?', [code, barcodeId]);
+    if (duplicateCode) {
+      return c.json({ error: 'Barcode code already exists' }, 400);
+    }
+
+    // Validate that at least one reference is provided
+    if (!fk_lot_in && !fk_lot_out && !fk_package) {
+      return c.json({ error: 'At least one reference (lot_in, lot_out, or package) must be provided' }, 400);
+    }
+
+    // Check if lot_in exists (if provided)
+    if (fk_lot_in) {
+      const lotIn = await database.getRow('SELECT id FROM lot_in WHERE id = ?', [fk_lot_in]);
+      if (!lotIn) {
+        return c.json({ error: 'Incoming lot not found' }, 400);
+      }
+    }
+
+    // Check if lot_out exists (if provided)
+    if (fk_lot_out) {
+      const lotOut = await database.getRow('SELECT id FROM lot_out WHERE id = ?', [fk_lot_out]);
+      if (!lotOut) {
+        return c.json({ error: 'Outgoing lot not found' }, 400);
+      }
+    }
+
+    // Check if package exists (if provided)
+    if (fk_package) {
+      const packageItem = await database.getRow('SELECT id FROM package WHERE id = ?', [fk_package]);
+      if (!packageItem) {
+        return c.json({ error: 'Package not found' }, 400);
+      }
+    }
+
+    await database.runQuery(
+      'UPDATE barcode SET code = ?, type = ?, description = ?, fk_lot_in = ?, fk_lot_out = ?, fk_package = ? WHERE id = ?',
+      [code, type, description || null, fk_lot_in || null, fk_lot_out || null, fk_package || null, barcodeId]
+    );
+
+    const updatedBarcode = await database.getRow(`
+      SELECT 
+        b.*,
+        li.lot_number as lot_in_number,
+        lo.lot_number as lot_out_number,
+        p.description as package_description
+      FROM barcode b
+      LEFT JOIN lot_in li ON b.fk_lot_in = li.id
+      LEFT JOIN lot_out lo ON b.fk_lot_out = lo.id
+      LEFT JOIN package p ON b.fk_package = p.id
+      WHERE b.id = ?
+    `, [barcodeId]);
+    
+    return c.json(updatedBarcode);
+  } catch (error) {
+    console.error('Error updating barcode:', error);
+    return c.json({ error: 'Failed to update barcode' }, 500);
   }
-  const remainder = sum % 10;
-  return remainder === 0 ? 0 : 10 - remainder;
-}
+});
 
-// Helper function to convert GTIN data to CSV
-function convertGTINToCSV(data) {
-  const csvRows = [];
-  
-  // Add headers
-  csvRows.push('Export Date: ' + data.exportDate);
-  csvRows.push('');
-  
-  // GTIN Codes
-  csvRows.push('GTIN CODES');
-  csvRows.push('ID,Code,Progressive,Food Count,Package Count');
-  
-  data.gtinCodes.forEach(gtin => {
-    csvRows.push([
-      gtin.id,
-      gtin.code,
-      gtin.progressive,
-      gtin.food_count,
-      gtin.package_count
-    ].join(','));
-  });
-  
-  return csvRows.join('\n');
-}
+// Delete barcode
+router.delete('/:id', async (c) => {
+  try {
+    const database = c.get('database');
+    if (!database) {
+      return c.json({ error: 'Database not available' }, 500);
+    }
+    
+    const barcodeId = c.req.param('id');
 
-module.exports = router; 
+    // Check if barcode exists
+    const existingBarcode = await database.getRow('SELECT id FROM barcode WHERE id = ?', [barcodeId]);
+    if (!existingBarcode) {
+      return c.json({ error: 'Barcode not found' }, 404);
+    }
+
+    await database.runQuery('DELETE FROM barcode WHERE id = ?', [barcodeId]);
+    return c.json({ message: 'Barcode deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting barcode:', error);
+    return c.json({ error: 'Failed to delete barcode' }, 500);
+  }
+});
+
+// Get barcodes statistics for dashboard
+router.get('/stats/summary', async (c) => {
+  try {
+    const database = c.get('database');
+    if (!database) {
+      return c.json({ error: 'Database not available' }, 500);
+    }
+    
+    // Get total barcodes count
+    const totalBarcodesResult = await database.getRow('SELECT COUNT(*) as count FROM barcode');
+    const totalBarcodes = totalBarcodesResult.count || 0;
+    
+    // Get barcodes by type count
+    const barcodesByTypeResult = await database.getAll('SELECT type, COUNT(*) as count FROM barcode GROUP BY type');
+    const barcodesByType = barcodesByTypeResult || [];
+    
+    // Get barcodes by reference type count
+    const lotInBarcodesResult = await database.getRow('SELECT COUNT(*) as count FROM barcode WHERE fk_lot_in IS NOT NULL');
+    const lotInBarcodes = lotInBarcodesResult.count || 0;
+    
+    const lotOutBarcodesResult = await database.getRow('SELECT COUNT(*) as count FROM barcode WHERE fk_lot_out IS NOT NULL');
+    const lotOutBarcodes = lotOutBarcodesResult.count || 0;
+    
+    const packageBarcodesResult = await database.getRow('SELECT COUNT(*) as count FROM barcode WHERE fk_package IS NOT NULL');
+    const packageBarcodes = packageBarcodesResult.count || 0;
+    
+    return c.json({
+      totalBarcodes,
+      barcodesByType,
+      lotInBarcodes,
+      lotOutBarcodes,
+      packageBarcodes
+    });
+  } catch (error) {
+    console.error('Error fetching barcodes stats:', error);
+    return c.json({ error: 'Failed to fetch barcodes statistics' }, 500);
+  }
+});
+
+export default router; 

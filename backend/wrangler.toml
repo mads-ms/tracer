@@ -1,0 +1,30 @@
+name = "haccp-trace-backend"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+[env.production]
+name = "haccp-trace-backend-prod"
+
+# Custom domain for production
+[[env.production.routes]]
+pattern = "api.sabor.farm/*"
+zone_name = "sabor.farm"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "haccp-trace-db"
+database_id = "f66a6fa2-ec29-49f8-b91f-a76a765064d7"
+
+[env.development]
+name = "haccp-trace-backend-dev"
+
+[[env.development.d1_databases]]
+binding = "DB"
+database_name = "haccp-trace-db-dev"
+database_id = "your-dev-database-id-here"
+
+[build]
+command = "npm run build"
+
+[build.upload]
+format = "service-worker"

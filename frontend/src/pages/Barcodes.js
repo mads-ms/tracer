@@ -33,51 +33,84 @@ import {
   Delete as DeleteIcon,
   Search as SearchIcon,
   Refresh as RefreshIcon,
-  QrCode as QrCodeIcon,
-  CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon
+  QrCode as QrCodeIcon
 } from '@mui/icons-material';
 import { API_ENDPOINTS, buildApiUrl } from '../config/api';
 
 const Barcodes = () => {
-  const [gtinCodes, setGtinCodes] = useState([]);
+  const [barcodes, setBarcodes] = useState([]);
+  const [lotsIn, setLotsIn] = useState([]);
+  const [lotsOut, setLotsOut] = useState([]);
+  const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingGtin, setEditingGtin] = useState(null);
+  const [editingBarcode, setEditingBarcode] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [stats, setStats] = useState({});
-  const [validationDialogOpen, setValidationDialogOpen] = useState(false);
-  const [validationCode, setValidationCode] = useState('');
-  const [validationResult, setValidationResult] = useState(null);
-  const [generationDialogOpen, setGenerationDialogOpen] = useState(false);
-  const [generationData, setGenerationData] = useState({
-    prefix: '',
-    startNumber: 1
-  });
 
   const [formData, setFormData] = useState({
     code: '',
-    progressive: 0
+    type: '',
+    description: '',
+    fk_lot_in: '',
+    fk_lot_out: '',
+    fk_package: ''
   });
 
   useEffect(() => {
-    fetchGtinCodes();
+    fetchBarcodes();
+    fetchLotsIn();
+    fetchLotsOut();
+    fetchPackages();
     fetchStats();
   }, []);
 
-  const fetchGtinCodes = async () => {
+  const fetchBarcodes = async () => {
     try {
       setLoading(true);
       const response = await fetch(API_ENDPOINTS.BARCODES);
-      if (!response.ok) throw new Error('Failed to fetch GTIN codes');
+      if (!response.ok) throw new Error('Failed to fetch barcodes');
       const data = await response.json();
-      setGtinCodes(data);
+      setBarcodes(data);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchLotsIn = async () => {
+    try {
+      const response = await fetch(API_ENDPOINTS.LOTS_IN);
+      if (!response.ok) throw new Error('Failed to fetch incoming lots');
+      const data = await response.json();
+      setLotsIn(data);
+    } catch (err) {
+      console.error('Error fetching incoming lots:', err);
+    }
+  };
+
+  const fetchLotsOut = async () => {
+    try {
+      const response = await fetch(API_ENDPOINTS.LOTS_OUT);
+      if (!response.ok) throw new Error('Failed to fetch outgoing lots');
+      const data = await response.json();
+      setLotsOut(data);
+    } catch (err) {
+      console.error('Error fetching outgoing lots:', err);
+    }
+  };
+
+  const fetchPackages = async () => {
+    try {
+      const response = await fetch(API_ENDPOINTS.PACKAGES);
+      if (!response.ok) throw new Error('Failed to fetch packages');
+      const data = await response.json();
+      setPackages(data);
+    } catch (err) {
+      console.error('Error fetching packages:', err);
     }
   };
 
@@ -95,11 +128,11 @@ const Barcodes = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const url = editingGtin 
-        ? `${API_ENDPOINTS.BARCODES}/${editingGtin.id}`
+      const url = editingBarcode 
+        ? `${API_ENDPOINTS.BARCODES}/${editingBarcode.id}`
         : API_ENDPOINTS.BARCODES;
       
-      const method = editingGtin ? 'PUT' : 'POST';
+      const method = editingBarcode ? 'PUT' : 'POST';
       
       const response = await fetch(url, {
         method,
@@ -109,141 +142,120 @@ const Barcodes = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save GTIN');
+        throw new Error(errorData.error || 'Failed to save barcode');
       }
 
-      setSuccess(editingGtin ? 'GTIN updated successfully!' : 'GTIN created successfully!');
+      setSuccess(editingBarcode ? 'Barcode updated successfully' : 'Barcode created successfully');
       setDialogOpen(false);
+      setEditingBarcode(null);
       resetForm();
-      fetchGtinCodes();
+      fetchBarcodes();
       fetchStats();
     } catch (err) {
       setError(err.message);
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this GTIN?')) return;
-    
-    try {
-      const response = await fetch(`${API_ENDPOINTS.BARCODES}/${id}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete GTIN');
-      }
-
-      setSuccess('GTIN deleted successfully!');
-      fetchGtinCodes();
-      fetchStats();
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
-  const handleEdit = (gtin) => {
-    setEditingGtin(gtin);
+  const handleEdit = (barcode) => {
+    setEditingBarcode(barcode);
     setFormData({
-      code: gtin.code,
-      progressive: gtin.progressive
+      code: barcode.code || '',
+      type: barcode.type || '',
+      description: barcode.description || '',
+      fk_lot_in: barcode.fk_lot_in || '',
+      fk_lot_out: barcode.fk_lot_out || '',
+      fk_package: barcode.fk_package || ''
     });
     setDialogOpen(true);
   };
 
-  const handleValidate = async () => {
-    if (!validationCode.trim()) {
-      setError('Please enter a GTIN code to validate');
-      return;
-    }
+  const handleDelete = async (barcode) => {
+    if (window.confirm(`Are you sure you want to delete barcode "${barcode.code}"?`)) {
+      try {
+        const response = await fetch(`${API_ENDPOINTS.BARCODES}/${barcode.id}`, {
+          method: 'DELETE'
+        });
 
-    try {
-      const response = await fetch(buildApiUrl('barcodes/validate'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: validationCode })
-      });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to delete barcode');
+        }
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Validation failed');
+        setSuccess('Barcode deleted successfully');
+        fetchBarcodes();
+        fetchStats();
+      } catch (err) {
+        setError(err.message);
       }
-
-      const result = await response.json();
-      setValidationResult(result);
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
-  const handleGenerate = async () => {
-    if (!generationData.prefix.trim()) {
-      setError('Please enter a prefix');
-      return;
-    }
-
-    try {
-      const response = await fetch(buildApiUrl(`barcodes/generate/next?prefix=${generationData.prefix}&startNumber=${generationData.startNumber}`));
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Generation failed');
-      }
-
-      const result = await response.json();
-      setFormData({
-        code: result.gtinCode,
-        progressive: result.nextProgressive
-      });
-      setGenerationDialogOpen(false);
-      setDialogOpen(true);
-    } catch (err) {
-      setError(err.message);
     }
   };
 
   const resetForm = () => {
     setFormData({
       code: '',
-      progressive: 0
+      type: '',
+      description: '',
+      fk_lot_in: '',
+      fk_lot_out: '',
+      fk_package: ''
     });
-    setEditingGtin(null);
   };
 
-  const handleDialogClose = () => {
-    setDialogOpen(false);
-    resetForm();
-  };
-
-  const filteredGtinCodes = gtinCodes.filter(gtin =>
-    gtin.code?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredBarcodes = barcodes.filter(barcode =>
+    barcode.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    barcode.type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    barcode.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const validateGTINFormat = (code) => {
-    return /^\d{13}$/.test(code);
-  };
+  if (loading) {
+    return (
+      <Container>
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+          <Typography>Loading barcodes...</Typography>
+        </Box>
+      </Container>
+    );
+  }
 
   return (
     <Container maxWidth="xl">
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          GTIN Barcodes Management
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Manage GTIN-13 codes for product identification
-        </Typography>
+      <Box mb={3}>
+        <Grid container spacing={3} alignItems="center">
+          <Grid item xs={12} md={6}>
+            <Typography variant="h4" component="h1">
+              Barcode Management
+            </Typography>
+            <Typography variant="subtitle1" color="textSecondary">
+              Manage barcodes for lots and packages
+            </Typography>
+          </Grid>
+          <Grid item xs={12} md={6} textAlign="right">
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<AddIcon />}
+              onClick={() => {
+                setEditingBarcode(null);
+                resetForm();
+                setDialogOpen(true);
+              }}
+            >
+              Add New Barcode
+            </Button>
+          </Grid>
+        </Grid>
       </Box>
 
-      {/* Statistics Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
+      {/* Stats Cards */}
+      <Grid container spacing={3} mb={3}>
         <Grid item xs={12} sm={6} md={3}>
           <Card>
             <CardContent>
-              <Typography color="text.secondary" gutterBottom>
-                Total GTINs
+              <Typography color="textSecondary" gutterBottom>
+                Total Barcodes
               </Typography>
               <Typography variant="h4">
-                {stats.totalGTINs || 0}
+                {stats.totalBarcodes || 0}
               </Typography>
             </CardContent>
           </Card>
@@ -251,11 +263,11 @@ const Barcodes = () => {
         <Grid item xs={12} sm={6} md={3}>
           <Card>
             <CardContent>
-              <Typography color="text.secondary" gutterBottom>
-                With Foods
+              <Typography color="textSecondary" gutterBottom>
+                Lot In Barcodes
               </Typography>
               <Typography variant="h4">
-                {stats.gtinWithFoods || 0}
+                {stats.lotInBarcodes || 0}
               </Typography>
             </CardContent>
           </Card>
@@ -263,11 +275,11 @@ const Barcodes = () => {
         <Grid item xs={12} sm={6} md={3}>
           <Card>
             <CardContent>
-              <Typography color="text.secondary" gutterBottom>
-                With Packages
+              <Typography color="textSecondary" gutterBottom>
+                Lot Out Barcodes
               </Typography>
               <Typography variant="h4">
-                {stats.gtinWithPackages || 0}
+                {stats.lotOutBarcodes || 0}
               </Typography>
             </CardContent>
           </Card>
@@ -275,278 +287,226 @@ const Barcodes = () => {
         <Grid item xs={12} sm={6} md={3}>
           <Card>
             <CardContent>
-              <Typography color="text.secondary" gutterBottom>
-                Unused
+              <Typography color="textSecondary" gutterBottom>
+                Package Barcodes
               </Typography>
               <Typography variant="h4">
-                {stats.unusedGTINs || 0}
+                {stats.packageBarcodes || 0}
               </Typography>
             </CardContent>
           </Card>
         </Grid>
       </Grid>
 
+      {/* Search and Actions */}
+      <Box mb={3}>
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} md={6}>
+            <TextField
+              fullWidth
+              variant="outlined"
+              placeholder="Search barcodes by code, type, or description..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{
+                startAdornment: <SearchIcon color="action" />
+              }}
+            />
+          </Grid>
+          <Grid item xs={12} md={6} textAlign="right">
+            <Button
+              startIcon={<RefreshIcon />}
+              onClick={() => {
+                fetchBarcodes();
+                fetchStats();
+              }}
+            >
+              Refresh
+            </Button>
+          </Grid>
+        </Grid>
+      </Box>
+
       {/* Alerts */}
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+        <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>
           {error}
         </Alert>
       )}
       {success && (
-        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>
+        <Alert severity="success" onClose={() => setSuccess('')} sx={{ mb: 2 }}>
           {success}
         </Alert>
       )}
 
-      {/* Actions Bar */}
-      <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => setDialogOpen(true)}
-        >
-          Add GTIN
-        </Button>
-        <Button
-          variant="outlined"
-          startIcon={<QrCodeIcon />}
-          onClick={() => setGenerationDialogOpen(true)}
-        >
-          Generate GTIN
-        </Button>
-        <Button
-          variant="outlined"
-          startIcon={<CheckCircleIcon />}
-          onClick={() => setValidationDialogOpen(true)}
-        >
-          Validate GTIN
-        </Button>
-        <Button
-          variant="outlined"
-          startIcon={<RefreshIcon />}
-          onClick={() => {
-            fetchGtinCodes();
-            fetchStats();
-          }}
-        >
-          Refresh
-        </Button>
-        <TextField
-          size="small"
-          placeholder="Search GTIN codes..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
-          }}
-          sx={{ ml: 'auto', minWidth: 300 }}
-        />
-      </Box>
-
-      {/* GTIN Codes Table */}
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>GTIN Code</TableCell>
-              <TableCell>Progressive</TableCell>
-              <TableCell>Food Count</TableCell>
-              <TableCell>Package Count</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {loading ? (
+      {/* Barcodes Table */}
+      <Paper>
+        <TableContainer>
+          <Table>
+            <TableHead>
               <TableRow>
-                <TableCell colSpan={6} align="center">
-                  Loading...
-                </TableCell>
+                <TableCell>Barcode</TableCell>
+                <TableCell>Type</TableCell>
+                <TableCell>Description</TableCell>
+                <TableCell>Reference</TableCell>
+                <TableCell>Actions</TableCell>
               </TableRow>
-            ) : filteredGtinCodes.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} align="center">
-                  No GTIN codes found
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredGtinCodes.map((gtin) => (
-                <TableRow key={gtin.id}>
+            </TableHead>
+            <TableBody>
+              {filteredBarcodes.map((barcode) => (
+                <TableRow key={barcode.id}>
                   <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <QrCodeIcon fontSize="small" color="primary" />
-                      <Typography variant="body2" fontWeight="bold" fontFamily="monospace">
-                        {gtin.code}
+                    <Box display="flex" alignItems="center" gap={1}>
+                      <QrCodeIcon color="primary" />
+                      <Typography variant="body2" fontFamily="monospace">
+                        {barcode.code}
                       </Typography>
                     </Box>
                   </TableCell>
-                  <TableCell>{gtin.progressive}</TableCell>
                   <TableCell>
-                    <Chip 
-                      label={gtin.food_count || 0} 
-                      size="small" 
-                      color="primary" 
-                      variant="outlined"
-                    />
+                    <Chip label={barcode.type} color="primary" size="small" />
                   </TableCell>
+                  <TableCell>{barcode.description || '-'}</TableCell>
                   <TableCell>
-                    <Chip 
-                      label={gtin.package_count || 0} 
-                      size="small" 
-                      color="secondary" 
-                      variant="outlined"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    {gtin.food_count > 0 || gtin.package_count > 0 ? (
-                      <Chip label="In Use" size="small" color="success" />
-                    ) : (
-                      <Chip label="Unused" size="small" color="default" />
+                    {barcode.lot_in_number && (
+                      <Chip 
+                        label={`Lot In: ${barcode.lot_in_number}`} 
+                        color="secondary" 
+                        size="small" 
+                      />
+                    )}
+                    {barcode.lot_out_number && (
+                      <Chip 
+                        label={`Lot Out: ${barcode.lot_out_number}`} 
+                        color="secondary" 
+                        size="small" 
+                      />
+                    )}
+                    {barcode.package_description && (
+                      <Chip 
+                        label={`Package: ${barcode.package_description}`} 
+                        color="secondary" 
+                        size="small" 
+                      />
                     )}
                   </TableCell>
                   <TableCell>
                     <IconButton
                       size="small"
-                      onClick={() => handleEdit(gtin)}
+                      onClick={() => handleEdit(barcode)}
                       color="primary"
                     >
                       <EditIcon />
                     </IconButton>
                     <IconButton
                       size="small"
-                      onClick={() => handleDelete(gtin.id)}
+                      onClick={() => handleDelete(barcode)}
                       color="error"
-                      disabled={gtin.food_count > 0 || gtin.package_count > 0}
                     >
                       <DeleteIcon />
                     </IconButton>
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
 
       {/* Add/Edit Dialog */}
-      <Dialog open={dialogOpen} onClose={handleDialogClose} maxWidth="sm" fullWidth>
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>
-          {editingGtin ? 'Edit GTIN' : 'Add New GTIN'}
+          {editingBarcode ? 'Edit Barcode' : 'Add New Barcode'}
         </DialogTitle>
-        <form onSubmit={handleSubmit}>
-          <DialogContent>
+        <DialogContent>
+          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
             <Grid container spacing={2}>
-              <Grid item xs={12}>
+              <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
-                  label="GTIN Code (13 digits)"
+                  label="Barcode Code *"
                   value={formData.code}
-                  onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                  onChange={(e) => setFormData({...formData, code: e.target.value})}
                   required
-                  margin="normal"
-                  inputProps={{ maxLength: 13 }}
-                  error={formData.code && !validateGTINFormat(formData.code)}
-                  helperText={formData.code && !validateGTINFormat(formData.code) ? 'GTIN must be exactly 13 digits' : ''}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Type *"
+                  value={formData.type}
+                  onChange={(e) => setFormData({...formData, type: e.target.value})}
+                  placeholder="e.g., QR, Code128, EAN13"
+                  required
                 />
               </Grid>
               <Grid item xs={12}>
                 <TextField
                   fullWidth
-                  label="Progressive Number"
-                  type="number"
-                  value={formData.progressive}
-                  onChange={(e) => setFormData({ ...formData, progressive: parseInt(e.target.value) || 0 })}
-                  margin="normal"
+                  label="Description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({...formData, description: e.target.value})}
+                  placeholder="Optional description"
                 />
               </Grid>
+              <Grid item xs={12} md={4}>
+                <FormControl fullWidth>
+                  <InputLabel>Reference Lot In</InputLabel>
+                  <Select
+                    value={formData.fk_lot_in}
+                    onChange={(e) => setFormData({...formData, fk_lot_in: e.target.value})}
+                    label="Reference Lot In"
+                  >
+                    <MenuItem value="">None</MenuItem>
+                    {lotsIn.map((lot) => (
+                      <MenuItem key={lot.id} value={lot.id}>
+                        {lot.lot_number} - {lot.food_name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <FormControl fullWidth>
+                  <InputLabel>Reference Lot Out</InputLabel>
+                  <Select
+                    value={formData.fk_lot_out}
+                    onChange={(e) => setFormData({...formData, fk_lot_out: e.target.value})}
+                    label="Reference Lot Out"
+                  >
+                    <MenuItem value="">None</MenuItem>
+                    {lotsOut.map((lot) => (
+                      <MenuItem key={lot.id} value={lot.id}>
+                        {lot.lot_number} - {lot.food_name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <FormControl fullWidth>
+                  <InputLabel>Reference Package</InputLabel>
+                  <Select
+                    value={formData.fk_package}
+                    onChange={(e) => setFormData({...formData, fk_package: e.target.value})}
+                    label="Reference Package"
+                  >
+                    <MenuItem value="">None</MenuItem>
+                    {packages.map((pkg) => (
+                      <MenuItem key={pkg.id} value={pkg.id}>
+                        {pkg.description} ({pkg.type})
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
             </Grid>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleDialogClose}>Cancel</Button>
-            <Button type="submit" variant="contained">
-              {editingGtin ? 'Update' : 'Create'}
-            </Button>
-          </DialogActions>
-        </form>
-      </Dialog>
-
-      {/* Validation Dialog */}
-      <Dialog open={validationDialogOpen} onClose={() => setValidationDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Validate GTIN Code</DialogTitle>
-        <DialogContent>
-          <Box sx={{ mb: 2 }}>
-            <TextField
-              fullWidth
-              label="GTIN Code"
-              value={validationCode}
-              onChange={(e) => setValidationCode(e.target.value)}
-              margin="normal"
-              inputProps={{ maxLength: 13 }}
-            />
           </Box>
-          {validationResult && (
-            <Box sx={{ mt: 2 }}>
-              <Alert 
-                severity={validationResult.valid ? 'success' : 'error'}
-                icon={validationResult.valid ? <CheckCircleIcon /> : <ErrorIcon />}
-              >
-                <Typography variant="body2">
-                  <strong>GTIN:</strong> {validationResult.code}
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Provided Check Digit:</strong> {validationResult.providedCheckDigit}
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Calculated Check Digit:</strong> {validationResult.calculatedCheckDigit}
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Valid:</strong> {validationResult.valid ? 'Yes' : 'No'}
-                </Typography>
-              </Alert>
-            </Box>
-          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setValidationDialogOpen(false)}>Close</Button>
-          <Button onClick={handleValidate} variant="contained">
-            Validate
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Generation Dialog */}
-      <Dialog open={generationDialogOpen} onClose={() => setGenerationDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Generate Next GTIN</DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2}>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Prefix (12 digits)"
-                value={generationData.prefix}
-                onChange={(e) => setGenerationData({ ...generationData, prefix: e.target.value })}
-                margin="normal"
-                inputProps={{ maxLength: 12 }}
-                error={generationData.prefix && !/^\d{12}$/.test(generationData.prefix)}
-                helperText={generationData.prefix && !/^\d{12}$/.test(generationData.prefix) ? 'Prefix must be exactly 12 digits' : ''}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Start Number"
-                type="number"
-                value={generationData.startNumber}
-                onChange={(e) => setGenerationData({ ...generationData, startNumber: parseInt(e.target.value) || 1 })}
-                margin="normal"
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setGenerationDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleGenerate} variant="contained">
-            Generate
+          <Button onClick={() => setDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleSubmit} variant="contained" color="primary">
+            {editingBarcode ? 'Update' : 'Create'}
           </Button>
         </DialogActions>
       </Dialog>

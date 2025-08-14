@@ -1,0 +1,11 @@
+{
+  "short_name": "HACCP Trace",
+  "name": "HACCP Trace - Food Traceability System",
+  "description": "Food Traceability System for HACCP Compliance",
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#000000",
+  "background_color": "#ffffff",
+  "categories": ["business", "productivity", "food"],
+  "lang": "en"
+}

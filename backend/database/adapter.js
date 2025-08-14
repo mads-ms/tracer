@@ -147,8 +147,20 @@ const initializeSqliteDatabase = (db) => {
 
 // Database factory
 const getDatabase = () => {
-  if (process.env.NODE_ENV === 'production' && process.env.DATABASE_URL) {
-    // Use PostgreSQL in production
+  if (process.env.DATABASE_TYPE === 'd1' && process.env.D1) {
+    // Use Cloudflare D1
+    const D1Database = require('./d1');
+    const d1Db = new D1Database(process.env.D1);
+    return {
+      type: 'd1',
+      db: d1Db,
+      initialize: () => d1Db.initialize(),
+      runQuery: (sql, params) => d1Db.runQuery(sql, params),
+      getRow: (sql, params) => d1Db.getRow(sql, params),
+      getAll: (sql, params) => d1Db.getAll(sql, params)
+    };
+  } else if (process.env.NODE_ENV === 'production' && process.env.DATABASE_URL) {
+    // Use PostgreSQL in production (fallback)
     const { pool, initializeDatabase } = require('./postgres');
     return {
       type: 'postgres',

@@ -6,14 +6,15 @@ const API_BASE = API_ENDPOINTS.COMPANY;
 
 const Company = () => {
   const [company, setCompany] = useState({
-    vat: '',
-    gs1_code: '',
     name: '',
+    vat: '',
     address: '',
-    cap: '',
     city: '',
+    country: '',
     phone: '',
-    email: ''
+    email: '',
+    website: '',
+    logo: ''
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -30,14 +31,15 @@ const Company = () => {
         if (!res.ok) throw new Error('Failed to fetch company info');
         const data = await res.json();
         setCompany({
-          vat: data.vat || '',
-          gs1_code: data.gs1_code || '',
           name: data.name || '',
+          vat: data.vat || '',
           address: data.address || '',
-          cap: data.cap || '',
           city: data.city || '',
+          country: data.country || '',
           phone: data.phone || '',
-          email: data.email || ''
+          email: data.email || '',
+          website: data.website || '',
+          logo: data.logo || ''
         });
       } catch (err) {
         setError('Failed to load company information.');
@@ -59,7 +61,7 @@ const Company = () => {
     setError(null);
     setSuccess(null);
     // Validate required fields
-    const required = ['vat', 'gs1_code', 'name', 'address', 'cap', 'city', 'phone', 'email'];
+    const required = ['name', 'vat', 'address', 'city', 'country', 'phone', 'email'];
     for (let field of required) {
       if (!company[field]) {
         setError('All fields are required.');
@@ -92,28 +94,24 @@ const Company = () => {
         {loading ? <p>Loading...</p> : (
           <form className="company-form" onSubmit={handleSave}>
             <div className="form-row">
-              <label>VAT *</label>
-              <input name="vat" value={company.vat} onChange={handleChange} required />
-            </div>
-            <div className="form-row">
-              <label>GS1 Code *</label>
-              <input name="gs1_code" value={company.gs1_code} onChange={handleChange} required />
-            </div>
-            <div className="form-row">
               <label>Company Name *</label>
               <input name="name" value={company.name} onChange={handleChange} required />
+            </div>
+            <div className="form-row">
+              <label>VAT *</label>
+              <input name="vat" value={company.vat} onChange={handleChange} required />
             </div>
             <div className="form-row">
               <label>Address *</label>
               <input name="address" value={company.address} onChange={handleChange} required />
             </div>
             <div className="form-row">
-              <label>Postal Code (CAP) *</label>
-              <input name="cap" value={company.cap} onChange={handleChange} required />
-            </div>
-            <div className="form-row">
               <label>City *</label>
               <input name="city" value={company.city} onChange={handleChange} required />
+            </div>
+            <div className="form-row">
+              <label>Country *</label>
+              <input name="country" value={company.country} onChange={handleChange} required />
             </div>
             <div className="form-row">
               <label>Phone *</label>
@@ -122,6 +120,14 @@ const Company = () => {
             <div className="form-row">
               <label>Email *</label>
               <input name="email" value={company.email} onChange={handleChange} required type="email" />
+            </div>
+            <div className="form-row">
+              <label>Website</label>
+              <input name="website" value={company.website} onChange={handleChange} />
+            </div>
+            <div className="form-row">
+              <label>Logo</label>
+              <input name="logo" value={company.logo} onChange={handleChange} />
             </div>
             {error && <div className="form-error">{error}</div>}
             {success && <div className="form-success">{success}</div>}

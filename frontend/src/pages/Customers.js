@@ -12,12 +12,14 @@ const Customers = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [formData, setFormData] = useState({
-    vat: '',
     name: '',
+    vat: '',
     address: '',
-    cap: '',
     city: '',
-    phone: ''
+    country: '',
+    phone: '',
+    email: '',
+    website: ''
   });
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [customerDetails, setCustomerDetails] = useState(null);
@@ -63,12 +65,14 @@ const Customers = () => {
   const handleEdit = (customer) => {
     setEditingCustomer(customer);
     setFormData({
-      vat: customer.vat,
       name: customer.name,
+      vat: customer.vat,
       address: customer.address || '',
-      cap: customer.cap || '',
       city: customer.city || '',
-      phone: customer.phone || ''
+      country: customer.country || '',
+      phone: customer.phone || '',
+      email: customer.email || '',
+      website: customer.website || ''
     });
     setShowForm(true);
   };
@@ -107,12 +111,14 @@ const Customers = () => {
 
   const resetForm = () => {
     setFormData({
-      vat: '',
       name: '',
+      vat: '',
       address: '',
-      cap: '',
       city: '',
-      phone: ''
+      country: '',
+      phone: '',
+      email: '',
+      website: ''
     });
   };
 
@@ -208,11 +214,11 @@ const Customers = () => {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">CAP *</label>
+                <label className="form-label">City *</label>
                 <input
                   type="text"
-                  value={formData.cap}
-                  onChange={(e) => setFormData({...formData, cap: e.target.value})}
+                  value={formData.city}
+                  onChange={(e) => setFormData({...formData, city: e.target.value})}
                   className="form-input"
                   required
                 />
@@ -220,11 +226,11 @@ const Customers = () => {
             </div>
             <div className="form-row">
               <div className="form-group">
-                <label className="form-label">City *</label>
+                <label className="form-label">Country *</label>
                 <input
                   type="text"
-                  value={formData.city}
-                  onChange={(e) => setFormData({...formData, city: e.target.value})}
+                  value={formData.country}
+                  onChange={(e) => setFormData({...formData, country: e.target.value})}
                   className="form-input"
                   required
                 />
@@ -237,6 +243,26 @@ const Customers = () => {
                   onChange={(e) => setFormData({...formData, phone: e.target.value})}
                   className="form-input"
                   required
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Email</label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  className="form-input"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Website</label>
+                <input
+                  type="url"
+                  value={formData.website}
+                  onChange={(e) => setFormData({...formData, website: e.target.value})}
+                  className="form-input"
                 />
               </div>
             </div>
@@ -277,9 +303,11 @@ const Customers = () => {
                   <th>VAT</th>
                   <th>Name</th>
                   <th>Address</th>
-                  <th>CAP</th>
                   <th>City</th>
+                  <th>Country</th>
                   <th>Phone</th>
+                  <th>Email</th>
+                  <th>Website</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -289,9 +317,11 @@ const Customers = () => {
                     <td>{customer.vat}</td>
                     <td>{customer.name}</td>
                     <td>{customer.address}</td>
-                    <td>{customer.cap}</td>
                     <td>{customer.city}</td>
+                    <td>{customer.country}</td>
                     <td>{customer.phone}</td>
+                    <td>{customer.email || '-'}</td>
+                    <td>{customer.website || '-'}</td>
                     <td>
                       <div className="action-buttons" onClick={e => e.stopPropagation()}>
                         <button
@@ -324,8 +354,10 @@ const Customers = () => {
             <h2>Customer Details</h2>
             <p><strong>Name:</strong> {selectedCustomer.name}</p>
             <p><strong>VAT:</strong> {selectedCustomer.vat}</p>
-            <p><strong>Address:</strong> {selectedCustomer.address}, {selectedCustomer.cap} {selectedCustomer.city}</p>
+            <p><strong>Address:</strong> {selectedCustomer.address}, {selectedCustomer.city}, {selectedCustomer.country}</p>
             <p><strong>Phone:</strong> {selectedCustomer.phone}</p>
+            <p><strong>Email:</strong> {selectedCustomer.email || '-'}</p>
+            <p><strong>Website:</strong> {selectedCustomer.website || '-'}</p>
             {detailsLoading ? (
               <div className="loading"><div className="spinner"></div></div>
             ) : customerDetails ? (

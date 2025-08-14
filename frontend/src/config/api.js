@@ -1,8 +1,13 @@
 // API Configuration
 const getApiBaseUrl = () => {
-  // In production, use the environment variable
-  if (process.env.NODE_ENV === 'production') {
-    return process.env.REACT_APP_API_URL;
+  // Check if we're in production by looking at the hostname
+  const isProduction = window.location.hostname !== 'localhost' && 
+                      window.location.hostname !== '127.0.0.1' &&
+                      !window.location.hostname.includes('localhost');
+  
+  if (isProduction) {
+    // Production: Use the custom domain for the backend API
+    return 'https://api.sabor.farm';
   }
   
   // In development, use localhost

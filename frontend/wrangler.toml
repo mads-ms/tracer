@@ -1,0 +1,20 @@
+name = "haccp-trace-frontend"
+compatibility_date = "2024-01-01"
+
+[build]
+command = "npm run build"
+output_dir = "build"
+
+[env.production]
+name = "haccp-trace-frontend-prod"
+
+# Custom domain for production
+[[env.production.routes]]
+pattern = "sabor.farm/*"
+zone_name = "sabor.farm"
+
+[env.development]
+name = "haccp-trace-frontend-dev"
+
+[site]
+bucket = "./build"

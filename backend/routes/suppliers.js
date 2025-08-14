@@ -1,160 +1,191 @@
-const express = require('express');
-const router = express.Router();
-const { runQuery, getRow, getAll } = require('../database/database');
+import { Hono } from 'hono';
+
+const router = new Hono();
 
 // Get all suppliers
-router.get('/', async (req, res) => {
+router.get('/', async (c) => {
   try {
-    const suppliers = await getAll('SELECT * FROM supplier ORDER BY name');
-    res.json(suppliers);
+    const database = c.get('database');
+    if (!database) {
+      return c.json({ error: 'Database not available' }, 500);
+    }
+    
+    const suppliers = await database.getAll('SELECT * FROM supplier ORDER BY name');
+    return c.json(suppliers);
   } catch (error) {
     console.error('Error fetching suppliers:', error);
-    res.status(500).json({ error: 'Failed to fetch suppliers' });
+    return c.json({ error: 'Failed to fetch suppliers' }, 500);
   }
 });
 
 // Get supplier by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', async (c) => {
   try {
-    const supplier = await getRow('SELECT * FROM supplier WHERE id = ?', [req.params.id]);
-    if (!supplier) {
-      return res.status(404).json({ error: 'Supplier not found' });
+    const database = c.get('database');
+    if (!database) {
+      return c.json({ error: 'Database not available' }, 500);
     }
-    res.json(supplier);
+    
+    const supplier = await database.getRow('SELECT * FROM supplier WHERE id = ?', [c.req.param('id')]);
+    if (!supplier) {
+      return c.json({ error: 'Supplier not found' }, 404);
+    }
+    return c.json(supplier);
   } catch (error) {
     console.error('Error fetching supplier:', error);
-    res.status(500).json({ error: 'Failed to fetch supplier' });
+    return c.json({ error: 'Failed to fetch supplier' }, 500);
   }
 });
 
 // Create new supplier
-router.post('/', async (req, res) => {
+router.post('/', async (c) => {
   try {
-    const { vat, name, address, phone } = req.body;
+    const database = c.get('database');
+    if (!database) {
+      return c.json({ error: 'Database not available' }, 500);
+    }
+    
+    const body = await c.req.json();
+    const { vat, name, address, city, country, phone, email, website } = body;
     
     // Validate required fields
     if (!vat || !name) {
-      return res.status(400).json({ error: 'VAT and name are required' });
+      return c.json({ error: 'VAT and name are required' }, 400);
     }
 
     // Check if VAT already exists
-    const existingSupplier = await getRow('SELECT id FROM supplier WHERE vat = ?', [vat]);
+    const existingSupplier = await database.getRow('SELECT id FROM supplier WHERE vat = ?', [vat]);
     if (existingSupplier) {
-      return res.status(400).json({ error: 'Supplier with this VAT already exists' });
+      return c.json({ error: 'Supplier with this VAT already exists' }, 400);
     }
 
-    const result = await runQuery(
-      'INSERT INTO supplier (vat, name, address, phone) VALUES (?, ?, ?, ?)',
-      [vat, name, address || null, phone || null]
+    const result = await database.runQuery(
+      'INSERT INTO supplier (vat, name, address, city, country, phone, email, website) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [vat, name, address || null, city || null, country || null, phone || null, email || null, website || null]
     );
 
-    const newSupplier = await getRow('SELECT * FROM supplier WHERE id = ?', [result.id]);
-    res.status(201).json(newSupplier);
+    // Check if we got a valid result
+    if (!result || !result.id) {
+      // If we can't get the ID, try to fetch the supplier by VAT and name
+      const newSupplier = await database.getRow(
+        'SELECT * FROM supplier WHERE vat = ? AND name = ? ORDER BY created_at DESC LIMIT 1',
+        [vat, name]
+      );
+      if (newSupplier) {
+        return c.json(newSupplier, 201);
+      } else {
+        return c.json({ 
+          message: 'Supplier created successfully but could not retrieve details',
+          success: true 
+        }, 201);
+      }
+    }
+
+    const newSupplier = await database.getRow('SELECT * FROM supplier WHERE id = ?', [result.id]);
+    return c.json(newSupplier, 201);
   } catch (error) {
     console.error('Error creating supplier:', error);
-    res.status(500).json({ error: 'Failed to create supplier' });
+    return c.json({ error: 'Failed to create supplier' }, 500);
   }
 });
 
 // Update supplier
-router.put('/:id', async (req, res) => {
+router.put('/:id', async (c) => {
   try {
-    const { vat, name, address, phone } = req.body;
-    const supplierId = req.params.id;
+    const database = c.get('database');
+    if (!database) {
+      return c.json({ error: 'Database not available' }, 500);
+    }
+    
+    const body = await c.req.json();
+    const { vat, name, address, city, country, phone, email, website } = body;
+    const supplierId = c.req.param('id');
 
     // Validate required fields
     if (!vat || !name) {
-      return res.status(400).json({ error: 'VAT and name are required' });
+      return c.json({ error: 'VAT and name are required' }, 400);
     }
 
     // Check if supplier exists
-    const existingSupplier = await getRow('SELECT id FROM supplier WHERE id = ?', [supplierId]);
+    const existingSupplier = await database.getRow('SELECT id FROM supplier WHERE id = ?', [supplierId]);
     if (!existingSupplier) {
-      return res.status(404).json({ error: 'Supplier not found' });
+      return c.json({ error: 'Supplier not found' }, 404);
     }
 
     // Check if VAT already exists for another supplier
-    const duplicateVat = await getRow('SELECT id FROM supplier WHERE vat = ? AND id != ?', [vat, supplierId]);
+    const duplicateVat = await database.getRow('SELECT id FROM supplier WHERE vat = ? AND id != ?', [vat, supplierId]);
     if (duplicateVat) {
-      return res.status(400).json({ error: 'Supplier with this VAT already exists' });
+      return c.json({ error: 'Supplier with this VAT already exists' }, 400);
     }
 
-    await runQuery(
-      'UPDATE supplier SET vat = ?, name = ?, address = ?, phone = ? WHERE id = ?',
-      [vat, name, address || null, phone || null, supplierId]
+    await database.runQuery(
+      'UPDATE supplier SET vat = ?, name = ?, address = ?, city = ?, country = ?, phone = ?, email = ?, website = ? WHERE id = ?',
+      [vat, name, address || null, city || null, country || null, phone || null, email || null, website || null, supplierId]
     );
 
-    const updatedSupplier = await getRow('SELECT * FROM supplier WHERE id = ?', [supplierId]);
-    res.json(updatedSupplier);
+    const updatedSupplier = await database.getRow('SELECT * FROM supplier WHERE id = ?', [supplierId]);
+    return c.json(updatedSupplier);
   } catch (error) {
     console.error('Error updating supplier:', error);
-    res.status(500).json({ error: 'Failed to update supplier' });
+    return c.json({ error: 'Failed to update supplier' }, 500);
   }
 });
 
 // Delete supplier
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', async (c) => {
   try {
-    const supplierId = req.params.id;
+    const database = c.get('database');
+    if (!database) {
+      return c.json({ error: 'Database not available' }, 500);
+    }
+    
+    const supplierId = c.req.param('id');
 
     // Check if supplier exists
-    const existingSupplier = await getRow('SELECT id FROM supplier WHERE id = ?', [supplierId]);
+    const existingSupplier = await database.getRow('SELECT id FROM supplier WHERE id = ?', [supplierId]);
     if (!existingSupplier) {
-      return res.status(404).json({ error: 'Supplier not found' });
+      return c.json({ error: 'Supplier not found' }, 404);
     }
 
-    // Check if supplier is used in any lots
-    const usedInLots = await getRow(
-      'SELECT COUNT(*) as count FROM lot_in WHERE fk_supplier = ?',
-      [supplierId]
-    );
-
-    if (usedInLots.count > 0) {
-      return res.status(400).json({ 
-        error: 'Cannot delete supplier. They have associated incoming lots.' 
-      });
+    // Check if supplier is referenced in lots
+    const referencedInLots = await database.getRow('SELECT id FROM lot_in WHERE supplier_id = ? LIMIT 1', [supplierId]);
+    if (referencedInLots) {
+      return c.json({ error: 'Cannot delete supplier: referenced in incoming lots' }, 400);
     }
 
-    await runQuery('DELETE FROM supplier WHERE id = ?', [supplierId]);
-    res.json({ message: 'Supplier deleted successfully' });
+    await database.runQuery('DELETE FROM supplier WHERE id = ?', [supplierId]);
+    return c.json({ message: 'Supplier deleted successfully' });
   } catch (error) {
     console.error('Error deleting supplier:', error);
-    res.status(500).json({ error: 'Failed to delete supplier' });
+    return c.json({ error: 'Failed to delete supplier' }, 500);
   }
 });
 
-// Search suppliers
-router.get('/search/:query', async (req, res) => {
+// Get supplier statistics for dashboard
+router.get('/stats/summary', async (c) => {
   try {
-    const query = `%${req.params.query}%`;
-    const suppliers = await getAll(
-      'SELECT * FROM supplier WHERE name LIKE ? OR vat LIKE ? OR address LIKE ? ORDER BY name',
-      [query, query, query]
-    );
-    res.json(suppliers);
-  } catch (error) {
-    console.error('Error searching suppliers:', error);
-    res.status(500).json({ error: 'Failed to search suppliers' });
-  }
-});
-
-// Get supplier statistics
-router.get('/stats/summary', async (req, res) => {
-  try {
-    const totalSuppliers = await getRow('SELECT COUNT(*) as count FROM supplier');
-    const suppliersWithLots = await getRow(
-      'SELECT COUNT(DISTINCT fk_supplier) as count FROM lot_in'
-    );
+    const database = c.get('database');
+    if (!database) {
+      return c.json({ error: 'Database not available' }, 500);
+    }
     
-    res.json({
-      totalSuppliers: totalSuppliers.count,
-      suppliersWithLots: suppliersWithLots.count,
-      suppliersWithoutLots: totalSuppliers.count - suppliersWithLots.count
+    // Get total suppliers count
+    const totalSuppliersResult = await database.getRow('SELECT COUNT(*) as count FROM supplier');
+    const totalSuppliers = totalSuppliersResult.count || 0;
+    
+    // Get suppliers with lots count
+    const suppliersWithLotsResult = await database.getRow('SELECT COUNT(DISTINCT supplier_id) as count FROM lot_in WHERE supplier_id IS NOT NULL');
+    const suppliersWithLots = suppliersWithLotsResult.count || 0;
+    
+    return c.json({
+      totalSuppliers,
+      suppliersWithLots,
+      suppliersWithoutLots: totalSuppliers - suppliersWithLots
     });
   } catch (error) {
-    console.error('Error fetching supplier statistics:', error);
-    res.status(500).json({ error: 'Failed to fetch supplier statistics' });
+    console.error('Error fetching supplier stats:', error);
+    return c.json({ error: 'Failed to fetch supplier statistics' }, 500);
   }
 });
 
-module.exports = router; 
+export default router; 

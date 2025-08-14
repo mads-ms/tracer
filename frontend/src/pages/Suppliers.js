@@ -15,7 +15,11 @@ const Suppliers = () => {
     vat: '',
     name: '',
     address: '',
-    phone: ''
+    city: '',
+    country: '',
+    phone: '',
+    email: '',
+    website: ''
   });
 
   useEffect(() => {
@@ -26,10 +30,18 @@ const Suppliers = () => {
     try {
       setLoading(true);
       const response = await axios.get(API_ENDPOINTS.SUPPLIERS);
-      setSuppliers(response.data);
+      
+      // Ensure we always have an array, even if the API returns something unexpected
+      if (Array.isArray(response.data)) {
+        setSuppliers(response.data);
+      } else {
+        console.warn('API returned non-array data:', response.data);
+        setSuppliers([]);
+      }
     } catch (error) {
       console.error('Error fetching suppliers:', error);
       toast.error('Failed to load suppliers');
+      setSuppliers([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
@@ -63,7 +75,11 @@ const Suppliers = () => {
       vat: supplier.vat,
       name: supplier.name,
       address: supplier.address || '',
-      phone: supplier.phone || ''
+      city: supplier.city || '',
+      country: supplier.country || '',
+      phone: supplier.phone || '',
+      email: supplier.email || '',
+      website: supplier.website || ''
     });
     setShowForm(true);
   };
@@ -86,11 +102,15 @@ const Suppliers = () => {
       vat: '',
       name: '',
       address: '',
-      phone: ''
+      city: '',
+      country: '',
+      phone: '',
+      email: '',
+      website: ''
     });
   };
 
-  const filteredSuppliers = suppliers.filter(supplier =>
+  const filteredSuppliers = (suppliers || []).filter(supplier =>
     supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     supplier.vat.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (supplier.address && supplier.address.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -181,11 +201,51 @@ const Suppliers = () => {
                 />
               </div>
               <div className="form-group">
+                <label className="form-label">City</label>
+                <input
+                  type="text"
+                  value={formData.city}
+                  onChange={(e) => setFormData({...formData, city: e.target.value})}
+                  className="form-input"
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Country</label>
+                <input
+                  type="text"
+                  value={formData.country}
+                  onChange={(e) => setFormData({...formData, country: e.target.value})}
+                  className="form-input"
+                />
+              </div>
+              <div className="form-group">
                 <label className="form-label">Phone</label>
                 <input
                   type="text"
                   value={formData.phone}
                   onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                  className="form-input"
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Email</label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  className="form-input"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Website</label>
+                <input
+                  type="url"
+                  value={formData.website}
+                  onChange={(e) => setFormData({...formData, website: e.target.value})}
                   className="form-input"
                 />
               </div>
@@ -227,7 +287,11 @@ const Suppliers = () => {
                   <th>VAT</th>
                   <th>Name</th>
                   <th>Address</th>
+                  <th>City</th>
+                  <th>Country</th>
                   <th>Phone</th>
+                  <th>Email</th>
+                  <th>Website</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -237,7 +301,11 @@ const Suppliers = () => {
                     <td>{supplier.vat}</td>
                     <td>{supplier.name}</td>
                     <td>{supplier.address || '-'}</td>
+                    <td>{supplier.city || '-'}</td>
+                    <td>{supplier.country || '-'}</td>
                     <td>{supplier.phone || '-'}</td>
+                    <td>{supplier.email || '-'}</td>
+                    <td>{supplier.website || '-'}</td>
                     <td>
                       <div className="action-buttons">
                         <button
